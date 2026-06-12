@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'config/supabase_config.dart';
+import 'pages/dashboard_page.dart';
 import 'pages/landing_page.dart';
 import 'pages/sign_in_page.dart';
 import 'theme/app_theme.dart';
@@ -27,6 +28,11 @@ final GoRouter _router = GoRouter(
       path: '/sign-in',
       builder: (BuildContext context, GoRouterState state) =>
           const SignInPage(),
+    ),
+    GoRoute(
+      path: '/dashboard',
+      builder: (BuildContext context, GoRouterState state) =>
+          const DashboardPage(),
     ),
   ],
 );

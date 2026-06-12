@@ -173,7 +173,7 @@ class _LandingPageState extends State<LandingPage> {
           child: ValueListenableBuilder<double>(
             valueListenable: _navProgress,
             builder: (BuildContext context, double s, _) =>
-                TopNav(scrolled: s, onSignIn: () => context.push('/sign-in')),
+                TopNav(scrolled: s, onSignIn: () => context.push('/sign-in'), onDashboard: () => context.push('/dashboard')),
           ),
         ),
 
@@ -578,6 +578,7 @@ class _ReducedMotionPage extends StatelessWidget {
               builder: (BuildContext context, double s, _) => TopNav(
                 scrolled: s,
                 onSignIn: () => context.push('/sign-in'),
+                onDashboard: () => context.push('/dashboard'),
               ),
             ),
           ),

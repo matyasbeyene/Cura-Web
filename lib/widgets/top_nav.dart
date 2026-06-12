@@ -12,11 +12,13 @@ class TopNav extends StatelessWidget {
     required this.scrolled,
     this.onSignIn,
     this.onGetApp,
+    this.onDashboard,
   });
 
   final double scrolled;
   final VoidCallback? onSignIn;
   final VoidCallback? onGetApp;
+  final VoidCallback? onDashboard;
 
   @override
   Widget build(BuildContext context) {
@@ -57,7 +59,7 @@ class TopNav extends StatelessWidget {
               if (wide) ...<Widget>[
                 _NavLink(label: 'Home', color: fg),
                 _NavLink(label: 'Features', color: fg),
-                _NavLink(label: 'Dashboard', color: fg),
+                _NavLink(label: 'Dashboard', color: fg, onTap: onDashboard),
                 const SizedBox(width: 16),
               ],
               // Sign in now uses the forest-green color the CTA used to have.
@@ -74,17 +76,18 @@ class TopNav extends StatelessWidget {
 }
 
 class _NavLink extends StatelessWidget {
-  const _NavLink({required this.label, required this.color});
+  const _NavLink({required this.label, required this.color, this.onTap});
 
   final String label;
   final Color color;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
-        onTap: () {},
+        onTap: onTap ?? () {},
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14),
           child: Text(
