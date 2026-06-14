@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
+import 'package:web/web.dart' as web;
 
 import '../intro/intro_overlay.dart';
 import '../scroll_video/scroll_video_scrubber.dart';
@@ -39,6 +40,7 @@ class _LandingPageState extends State<LandingPage> {
   bool _configLoaded = false;
   bool _videoReady = false;
   bool _introDone = false;
+  SiteAudience _audience = SiteAudience.student;
   Timer? _loaderTimeout;
 
   @override
@@ -55,8 +57,9 @@ class _LandingPageState extends State<LandingPage> {
 
   Future<void> _loadConfig() async {
     try {
-      final http.Response resp =
-          await http.get(Uri.base.resolve('media/scene.json'));
+      final http.Response resp = await http.get(
+        Uri.base.resolve('media/scene.json'),
+      );
       if (resp.statusCode == 200) {
         final Map<String, dynamic> map =
             jsonDecode(resp.body) as Map<String, dynamic>;
@@ -80,6 +83,20 @@ class _LandingPageState extends State<LandingPage> {
     _navProgress.value = (off / (vh * 0.55)).clamp(0.0, 1.0);
   }
 
+  void _setAudience(SiteAudience audience) {
+    if (_audience == audience) return;
+    setState(() => _audience = audience);
+  }
+
+  void _emailBusinessTeam() {
+    final Uri email = Uri(
+      scheme: 'mailto',
+      path: 'info@cura.coffee',
+      queryParameters: <String, String>{'subject': 'Cura for my business'},
+    );
+    web.window.location.href = email.toString();
+  }
+
   @override
   void dispose() {
     _loaderTimeout?.cancel();
@@ -94,7 +111,13 @@ class _LandingPageState extends State<LandingPage> {
   Widget build(BuildContext context) {
     // Reduced-motion visitors get a static poster page and no intro animation.
     if (MediaQuery.of(context).disableAnimations) {
-      return _ReducedMotionPage(navProgress: _navProgress, scroll: _scroll);
+      return _ReducedMotionPage(
+        navProgress: _navProgress,
+        scroll: _scroll,
+        audience: _audience,
+        onAudienceChanged: _setAudience,
+        onContact: _emailBusinessTeam,
+      );
     }
     // A single root Scaffold (so it reliably fills the screen) with the page
     // content and the first-load intro layered inside its body.
@@ -149,7 +172,10 @@ class _LandingPageState extends State<LandingPage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
                 SizedBox(height: runway),
-                const _ContentSections(),
+                _ContentSections(
+                  audience: _audience,
+                  onContact: _emailBusinessTeam,
+                ),
               ],
             ),
           ),
@@ -160,7 +186,8 @@ class _LandingPageState extends State<LandingPage> {
           child: IgnorePointer(
             child: ValueListenableBuilder<double>(
               valueListenable: _scrubProgress,
-              builder: (_, double p, _) => _HeroForeground(progress: p),
+              builder: (_, double p, _) =>
+                  _HeroForeground(progress: p, audience: _audience),
             ),
           ),
         ),
@@ -172,8 +199,12 @@ class _LandingPageState extends State<LandingPage> {
           right: 0,
           child: ValueListenableBuilder<double>(
             valueListenable: _navProgress,
-            builder: (BuildContext context, double s, _) =>
-                TopNav(scrolled: s, onSignIn: () => context.push('/sign-in'), onDashboard: () => context.push('/dashboard')),
+            builder: (BuildContext context, double s, _) => TopNav(
+              scrolled: s,
+              audience: _audience,
+              onAudienceChanged: _setAudience,
+              onDashboard: () => context.push('/dashboard'),
+            ),
           ),
         ),
 
@@ -206,7 +237,7 @@ class _Loader extends StatelessWidget {
             ),
             const SizedBox(height: 18),
             Text(
-              'brewing',
+              'loading Cura',
               style: GoogleFonts.inter(
                 fontSize: 13,
                 letterSpacing: 3,
@@ -220,19 +251,128 @@ class _Loader extends StatelessWidget {
   }
 }
 
+class _LandingCopy {
+  const _LandingCopy({
+    required this.scrollQuotes,
+    required this.introTitle,
+    required this.introBody,
+    required this.featuresTitle,
+    required this.features,
+    required this.ctaTitle,
+    required this.footer,
+  });
+
+  final List<ScrollQuote> scrollQuotes;
+  final String introTitle;
+  final String introBody;
+  final String featuresTitle;
+  final List<_FeatureCopy> features;
+  final String ctaTitle;
+  final String footer;
+}
+
+class _FeatureCopy {
+  const _FeatureCopy({
+    required this.icon,
+    required this.title,
+    required this.body,
+  });
+
+  final IconData icon;
+  final String title;
+  final String body;
+}
+
+const _LandingCopy _studentCopy = _LandingCopy(
+  scrollQuotes: kStudentScrollQuotes,
+  introTitle: 'Find your next focus spot.',
+  introBody:
+      'Cura helps students find places to study, stay on task, '
+      'and earn simple rewards. The web portal gives partners a '
+      'clear view of how students use their space, without showing '
+      'private student data.',
+  featuresTitle: 'Study better with Cura',
+  features: <_FeatureCopy>[
+    _FeatureCopy(
+      icon: Icons.place_rounded,
+      title: 'Find a good spot',
+      body:
+          'See study-friendly places near you and know what '
+          'they offer before you go.',
+    ),
+    _FeatureCopy(
+      icon: Icons.timer_rounded,
+      title: 'Stay on track',
+      body:
+          'Start a focus session, set a clear goal, and keep '
+          'your phone out of the way.',
+    ),
+    _FeatureCopy(
+      icon: Icons.card_giftcard_rounded,
+      title: 'Earn real perks',
+      body:
+          'Get rewards from partner cafes, libraries, and '
+          'campus spaces when you show up and focus.',
+    ),
+  ],
+  ctaTitle: 'Ready to focus?',
+  footer: '© 2026 Cura. Built for students and study-friendly places.',
+);
+
+const _LandingCopy _businessCopy = _LandingCopy(
+  scrollQuotes: kBusinessScrollQuotes,
+  introTitle: 'Bring focused students through the door.',
+  introBody:
+      'Cura helps study-friendly businesses become places students '
+      'choose on purpose. Offer simple rewards, see privacy-safe visit '
+      'trends, and give students a reason to come back.',
+  featuresTitle: 'How Cura helps businesses',
+  features: <_FeatureCopy>[
+    _FeatureCopy(
+      icon: Icons.groups_rounded,
+      title: 'Reach nearby students',
+      body:
+          'Show up in the Cura app when students are looking for '
+          'a good place to study.',
+    ),
+    _FeatureCopy(
+      icon: Icons.local_offer_rounded,
+      title: 'Create simple offers',
+      body:
+          'Set rewards that fit your business, from a free drink '
+          'to a study-session perk.',
+    ),
+    _FeatureCopy(
+      icon: Icons.insights_rounded,
+      title: 'Understand what works',
+      body:
+          'See sessions, focus hours, return visits, and offer '
+          'activity without private student data.',
+    ),
+  ],
+  ctaTitle: 'Want Cura at your business?',
+  footer: '© 2026 Cura. Built for students and study-friendly places.',
+);
+
+_LandingCopy _copyFor(SiteAudience audience) {
+  return audience == SiteAudience.business ? _businessCopy : _studentCopy;
+}
+
 /// Hero foreground over the white field: the scroll quotes plus a scroll cue
 /// that fades as soon as you begin scrolling.
 class _HeroForeground extends StatelessWidget {
-  const _HeroForeground({required this.progress});
+  const _HeroForeground({required this.progress, required this.audience});
 
   final double progress;
+  final SiteAudience audience;
 
   @override
   Widget build(BuildContext context) {
+    final _LandingCopy copy = _copyFor(audience);
     final double cueOpacity = (1.0 - progress / 0.10).clamp(0.0, 1.0);
     return Stack(
       children: <Widget>[
-        ScrollQuotes(progress: progress),
+        ScrollQuotes(progress: progress, quotes: copy.scrollQuotes),
         Positioned(
           bottom: 30,
           left: 0,
@@ -264,28 +404,34 @@ class _HeroForeground extends StatelessWidget {
   }
 }
 
-/// The opaque content that scrolls up over the video. Placeholder copy for now.
+/// The opaque content that scrolls up over the video.
 class _ContentSections extends StatelessWidget {
-  const _ContentSections();
+  const _ContentSections({required this.audience, required this.onContact});
+
+  final SiteAudience audience;
+  final VoidCallback onContact;
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        _IntroSection(),
-        _FeaturesSection(),
-        _CtaSection(),
+        _IntroSection(audience: audience),
+        _FeaturesSection(audience: audience),
+        _CtaSection(audience: audience, onContact: onContact),
       ],
     );
   }
 }
 
 class _IntroSection extends StatelessWidget {
-  const _IntroSection();
+  const _IntroSection({required this.audience});
+
+  final SiteAudience audience;
 
   @override
   Widget build(BuildContext context) {
+    final _LandingCopy copy = _copyFor(audience);
     final double w = MediaQuery.of(context).size.width;
     final double size = w < 600 ? 32 : 46;
     return ColoredBox(
@@ -298,7 +444,7 @@ class _IntroSection extends StatelessWidget {
             child: Column(
               children: <Widget>[
                 Text(
-                  'From the first scroll to the last drop.',
+                  copy.introTitle,
                   textAlign: TextAlign.center,
                   style: GoogleFonts.fraunces(
                     fontSize: size,
@@ -309,10 +455,7 @@ class _IntroSection extends StatelessWidget {
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  'Placeholder copy — this is where the story of the app lives. '
-                  'The hero above plays frame-by-frame as you scroll; everything '
-                  'down here follows the same warm, editorial system and is easy '
-                  'to swap out later.',
+                  copy.introBody,
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
                     fontSize: 18,
@@ -330,10 +473,13 @@ class _IntroSection extends StatelessWidget {
 }
 
 class _FeaturesSection extends StatelessWidget {
-  const _FeaturesSection();
+  const _FeaturesSection({required this.audience});
+
+  final SiteAudience audience;
 
   @override
   Widget build(BuildContext context) {
+    final _LandingCopy copy = _copyFor(audience);
     return ColoredBox(
       color: AppColors.latte,
       child: Padding(
@@ -344,7 +490,7 @@ class _FeaturesSection extends StatelessWidget {
             child: Column(
               children: <Widget>[
                 Text(
-                  'Crafted for the ritual',
+                  copy.featuresTitle,
                   textAlign: TextAlign.center,
                   style: GoogleFonts.fraunces(
                     fontSize: 40,
@@ -353,30 +499,19 @@ class _FeaturesSection extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 56),
-                const Wrap(
+                Wrap(
                   spacing: 24,
                   runSpacing: 24,
                   alignment: WrapAlignment.center,
-                  children: <Widget>[
-                    _FeatureCard(
-                      icon: Icons.coffee_rounded,
-                      title: 'Dialed in',
-                      body: 'Placeholder feature copy describing the first '
-                          'pillar of the product.',
-                    ),
-                    _FeatureCard(
-                      icon: Icons.bolt_rounded,
-                      title: 'Fast & fluid',
-                      body: 'Placeholder feature copy describing the second '
-                          'pillar of the product.',
-                    ),
-                    _FeatureCard(
-                      icon: Icons.favorite_rounded,
-                      title: 'Made to love',
-                      body: 'Placeholder feature copy describing the third '
-                          'pillar of the product.',
-                    ),
-                  ],
+                  children: copy.features
+                      .map(
+                        (_FeatureCopy feature) => _FeatureCard(
+                          icon: feature.icon,
+                          title: feature.title,
+                          body: feature.body,
+                        ),
+                      )
+                      .toList(growable: false),
                 ),
               ],
             ),
@@ -402,6 +537,7 @@ class _FeatureCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: 300,
+      constraints: const BoxConstraints(minHeight: 304),
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
         color: AppColors.cream,
@@ -452,10 +588,15 @@ class _FeatureCard extends StatelessWidget {
 }
 
 class _CtaSection extends StatelessWidget {
-  const _CtaSection();
+  const _CtaSection({required this.audience, required this.onContact});
+
+  final SiteAudience audience;
+  final VoidCallback onContact;
 
   @override
   Widget build(BuildContext context) {
+    final _LandingCopy copy = _copyFor(audience);
+    final bool businessView = audience == SiteAudience.business;
     return ColoredBox(
       color: AppColors.espresso,
       child: Padding(
@@ -466,7 +607,7 @@ class _CtaSection extends StatelessWidget {
             child: Column(
               children: <Widget>[
                 Text(
-                  'Bring the ritual home.',
+                  copy.ctaTitle,
                   textAlign: TextAlign.center,
                   style: GoogleFonts.fraunces(
                     fontSize: 44,
@@ -475,30 +616,13 @@ class _CtaSection extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 28),
-                FilledButton(
-                  onPressed: () {},
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.forest,
-                    foregroundColor: AppColors.cream,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 34,
-                      vertical: 20,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(40),
-                    ),
-                  ),
-                  child: Text(
-                    'Get the app',
-                    style: GoogleFonts.inter(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
+                if (businessView)
+                  ContactButton(onTap: onContact)
+                else
+                  const AppStoreBadge(),
                 const SizedBox(height: 80),
                 Text(
-                  '© 2026 BREW · placeholder footer',
+                  copy.footer,
                   style: GoogleFonts.inter(
                     fontSize: 13,
                     color: AppColors.cream.withValues(alpha: 0.6),
@@ -516,10 +640,19 @@ class _CtaSection extends StatelessWidget {
 /// Accessibility fallback: when the OS requests reduced motion, show a still
 /// poster hero instead of the scroll-scrubbed video (and no intro animation).
 class _ReducedMotionPage extends StatelessWidget {
-  const _ReducedMotionPage({required this.navProgress, required this.scroll});
+  const _ReducedMotionPage({
+    required this.navProgress,
+    required this.scroll,
+    required this.audience,
+    required this.onAudienceChanged,
+    required this.onContact,
+  });
 
   final ValueListenable<double> navProgress;
   final ScrollController scroll;
+  final SiteAudience audience;
+  final ValueChanged<SiteAudience> onAudienceChanged;
+  final VoidCallback onContact;
 
   @override
   Widget build(BuildContext context) {
@@ -551,7 +684,9 @@ class _ReducedMotionPage extends StatelessWidget {
                             ),
                             const SizedBox(height: 28),
                             Text(
-                              'A daily ritual, in motion.',
+                              audience == SiteAudience.business
+                                  ? 'Help students choose your space.'
+                                  : 'Find your focus with Cura.',
                               textAlign: TextAlign.center,
                               style: GoogleFonts.fraunces(
                                 fontSize: titleSize,
@@ -564,7 +699,7 @@ class _ReducedMotionPage extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const _ContentSections(),
+                  _ContentSections(audience: audience, onContact: onContact),
                 ],
               ),
             ),
@@ -577,7 +712,8 @@ class _ReducedMotionPage extends StatelessWidget {
               valueListenable: navProgress,
               builder: (BuildContext context, double s, _) => TopNav(
                 scrolled: s,
-                onSignIn: () => context.push('/sign-in'),
+                audience: audience,
+                onAudienceChanged: onAudienceChanged,
                 onDashboard: () => context.push('/dashboard'),
               ),
             ),

@@ -27,7 +27,7 @@ final GoRouter _router = GoRouter(
     GoRoute(
       path: '/sign-in',
       builder: (BuildContext context, GoRouterState state) =>
-          const SignInPage(),
+          SignInPage(redirectPath: state.uri.queryParameters['redirect']),
     ),
     GoRoute(
       path: '/dashboard',

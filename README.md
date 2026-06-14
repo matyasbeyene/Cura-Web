@@ -1,17 +1,19 @@
-# coffee_landing
+# Cura Web
 
-A new Flutter project.
+Cura Web is the public site and business dashboard for Cura, a study-focus iOS app.
 
-## Getting Started
+Students use Cura to find study-friendly places, start focus sessions, and earn rewards from partner locations. Partner businesses use the web dashboard to see simple, privacy-safe analytics about how students use their space.
 
-This project is a starting point for a Flutter application.
+## Run Locally
 
-A few resources to get you started if this is your first Flutter project:
+```powershell
+flutter pub get
+flutter run -d chrome
+```
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+## Check The Project
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```powershell
+flutter analyze
+flutter test
+```

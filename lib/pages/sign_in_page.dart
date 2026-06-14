@@ -13,7 +13,9 @@ import '../theme/app_theme.dart';
 /// OAuth. Reflects auth state: once signed in it shows a confirmation instead
 /// of the form.
 class SignInPage extends StatefulWidget {
-  const SignInPage({super.key});
+  const SignInPage({super.key, this.redirectPath});
+
+  final String? redirectPath;
 
   @override
   State<SignInPage> createState() => _SignInPageState();
@@ -30,14 +32,34 @@ class _SignInPageState extends State<SignInPage> {
   StreamSubscription<AuthState>? _authSub;
 
   SupabaseClient get _supabase => Supabase.instance.client;
+  String get _returnPath {
+    final value = widget.redirectPath?.trim() ?? '/';
+    if (value.isEmpty || !value.startsWith('/') || value.startsWith('//')) {
+      return '/';
+    }
+    if (value.startsWith('/sign-in')) return '/';
+    return value;
+  }
+
+  bool get _returningToDashboard => _returnPath == '/dashboard';
 
   @override
   void initState() {
     super.initState();
     // Keep the page in sync with auth changes (e.g. returning from Google).
-    _authSub = _supabase.auth.onAuthStateChange.listen((_) {
-      if (mounted) setState(() {});
+    _authSub = _supabase.auth.onAuthStateChange.listen((AuthState state) {
+      if (!mounted) return;
+      if (state.session != null && _returnPath != '/') {
+        context.go(_returnPath);
+        return;
+      }
+      setState(() {});
     });
+    if (_supabase.auth.currentUser != null && _returnPath != '/') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) context.go(_returnPath);
+      });
+    }
   }
 
   @override
@@ -59,7 +81,7 @@ class _SignInPageState extends State<SignInPage> {
         email: _email.text.trim(),
         password: _password.text,
       );
-      // Session is set; the auth listener rebuilds into the signed-in view.
+      if (mounted) context.go(_returnPath);
     } on AuthException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } catch (_) {
@@ -77,7 +99,7 @@ class _SignInPageState extends State<SignInPage> {
       // On web this redirects the page to Google and back to the app origin.
       await _supabase.auth.signInWithOAuth(
         OAuthProvider.google,
-        redirectTo: Uri.base.origin,
+        redirectTo: '${Uri.base.origin}/#$_returnPath',
       );
     } on AuthException catch (e) {
       if (mounted) setState(() => _error = e.message);
@@ -120,9 +142,7 @@ class _SignInPageState extends State<SignInPage> {
                   ),
                   const SizedBox(height: 8),
                   _Card(
-                    child: user != null
-                        ? _signedInView(user)
-                        : _formView(),
+                    child: user != null ? _signedInView(user) : _formView(),
                   ),
                 ],
               ),
@@ -134,11 +154,18 @@ class _SignInPageState extends State<SignInPage> {
   }
 
   Widget _signedInView(User user) {
+    final String actionLabel = _returningToDashboard
+        ? 'Open dashboard'
+        : 'Back to home';
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        const Icon(Icons.check_circle_rounded, color: AppColors.forest, size: 44),
+        const Icon(
+          Icons.check_circle_rounded,
+          color: AppColors.forest,
+          size: 44,
+        ),
         const SizedBox(height: 16),
         Text(
           'You\'re signed in',
@@ -157,9 +184,9 @@ class _SignInPageState extends State<SignInPage> {
         ),
         const SizedBox(height: 28),
         FilledButton(
-          onPressed: () => context.go('/'),
+          onPressed: () => context.go(_returnPath),
           style: _primaryStyle(),
-          child: _btnText('Back to home'),
+          child: _btnText(actionLabel),
         ),
         const SizedBox(height: 10),
         TextButton(
@@ -200,7 +227,9 @@ class _SignInPageState extends State<SignInPage> {
             label: _btnText('Continue with Google'),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.warmBlack,
-              side: BorderSide(color: AppColors.espresso.withValues(alpha: 0.25)),
+              side: BorderSide(
+                color: AppColors.espresso.withValues(alpha: 0.25),
+              ),
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -215,7 +244,10 @@ class _SignInPageState extends State<SignInPage> {
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Text(
                   'or',
-                  style: GoogleFonts.inter(fontSize: 13, color: AppColors.mocha),
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    color: AppColors.mocha,
+                  ),
                 ),
               ),
               const Expanded(child: Divider(color: Color(0x33000000))),
@@ -276,8 +308,11 @@ class _SignInPageState extends State<SignInPage> {
               ),
               child: Row(
                 children: <Widget>[
-                  const Icon(Icons.error_outline_rounded,
-                      color: Color(0xFFB3261E), size: 18),
+                  const Icon(
+                    Icons.error_outline_rounded,
+                    color: Color(0xFFB3261E),
+                    size: 18,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -303,8 +338,9 @@ class _SignInPageState extends State<SignInPage> {
                     height: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2.2,
-                      valueColor:
-                          AlwaysStoppedAnimation<Color>(AppColors.cream),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        AppColors.cream,
+                      ),
                     ),
                   )
                 : _btnText('Sign in'),
@@ -317,48 +353,49 @@ class _SignInPageState extends State<SignInPage> {
   // ---- small style helpers ----
 
   ButtonStyle _primaryStyle() => FilledButton.styleFrom(
-        backgroundColor: AppColors.forest,
-        foregroundColor: AppColors.cream,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      );
+    backgroundColor: AppColors.forest,
+    foregroundColor: AppColors.cream,
+    padding: const EdgeInsets.symmetric(vertical: 16),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  );
 
-  Widget _btnText(String s) =>
-      Text(s, style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600));
+  Widget _btnText(String s) => Text(
+    s,
+    style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600),
+  );
 
   Widget _label(String s) => Text(
-        s,
-        style: GoogleFonts.inter(
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          color: AppColors.espresso,
-        ),
-      );
+    s,
+    style: GoogleFonts.inter(
+      fontSize: 13,
+      fontWeight: FontWeight.w600,
+      color: AppColors.espresso,
+    ),
+  );
 
   InputDecoration _fieldDecoration(String hint) => InputDecoration(
-        hintText: hint,
-        hintStyle: GoogleFonts.inter(color: AppColors.mocha.withValues(alpha: 0.5)),
-        filled: true,
-        fillColor: AppColors.white,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: AppColors.espresso.withValues(alpha: 0.18)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.forest, width: 1.6),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFB3261E)),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFB3261E), width: 1.6),
-        ),
-      );
+    hintText: hint,
+    hintStyle: GoogleFonts.inter(color: AppColors.mocha.withValues(alpha: 0.5)),
+    filled: true,
+    fillColor: AppColors.white,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide(color: AppColors.espresso.withValues(alpha: 0.18)),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: AppColors.forest, width: 1.6),
+    ),
+    errorBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: Color(0xFFB3261E)),
+    ),
+    focusedErrorBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: Color(0xFFB3261E), width: 1.6),
+    ),
+  );
 }
 
 class _Card extends StatelessWidget {

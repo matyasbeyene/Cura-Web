@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Warm "specialty-coffee" brand palette, exposed as semantic tokens so colors
-/// are never hard-coded ad-hoc throughout the UI.
+/// Warm Cura brand palette, exposed as semantic tokens so colors are never
+/// hard-coded ad-hoc throughout the UI.
 class AppColors {
   AppColors._();
 
@@ -22,16 +22,17 @@ class AppTheme {
   AppTheme._();
 
   static ThemeData light() {
-    final ColorScheme scheme = ColorScheme.fromSeed(
-      seedColor: AppColors.espresso,
-      brightness: Brightness.light,
-    ).copyWith(
-      primary: AppColors.espresso,
-      secondary: AppColors.forest,
-      surface: AppColors.cream,
-      onPrimary: AppColors.cream,
-      onSurface: AppColors.warmBlack,
-    );
+    final ColorScheme scheme =
+        ColorScheme.fromSeed(
+          seedColor: AppColors.espresso,
+          brightness: Brightness.light,
+        ).copyWith(
+          primary: AppColors.espresso,
+          secondary: AppColors.forest,
+          surface: AppColors.cream,
+          onPrimary: AppColors.cream,
+          onSurface: AppColors.warmBlack,
+        );
 
     final ThemeData base = ThemeData(
       useMaterial3: true,

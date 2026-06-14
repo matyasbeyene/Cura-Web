@@ -16,23 +16,28 @@ class ScrollQuote {
   final double end; // scroll progress where it has fully gone
 }
 
-/// EDIT THESE: placeholder quotes. Per request the order is left → right → left.
-/// Replace the text (and tweak the start/end windows to retime them).
-const List<ScrollQuote> kScrollQuotes = <ScrollQuote>[
+/// Short lines that move with the hero video.
+const List<ScrollQuote> kStudentScrollQuotes = <ScrollQuote>[
+  ScrollQuote('Find a place that helps you focus.', QuoteSide.left, 0.12, 0.37),
+  ScrollQuote('Start a session. Stay with it.', QuoteSide.right, 0.41, 0.66),
+  ScrollQuote('Earn rewards for showing up.', QuoteSide.left, 0.70, 0.825),
+];
+
+const List<ScrollQuote> kBusinessScrollQuotes = <ScrollQuote>[
   ScrollQuote(
-    '“Placeholder quote one — your first line goes here.”',
+    'Bring focused students into your space.',
     QuoteSide.left,
     0.12,
     0.37,
   ),
   ScrollQuote(
-    '“Placeholder quote two — your second line goes here.”',
+    'Offer rewards without extra admin.',
     QuoteSide.right,
     0.41,
     0.66,
   ),
   ScrollQuote(
-    '“Placeholder quote three — your third line goes here.”',
+    'See visits, focus time, and what brings students back.',
     QuoteSide.left,
     0.70,
     0.825,
@@ -41,9 +46,14 @@ const List<ScrollQuote> kScrollQuotes = <ScrollQuote>[
 
 /// Renders the scroll quotes for the current [progress] (0..1).
 class ScrollQuotes extends StatelessWidget {
-  const ScrollQuotes({super.key, required this.progress});
+  const ScrollQuotes({
+    super.key,
+    required this.progress,
+    this.quotes = kStudentScrollQuotes,
+  });
 
   final double progress;
+  final List<ScrollQuote> quotes;
 
   @override
   Widget build(BuildContext context) {
@@ -51,8 +61,7 @@ class ScrollQuotes extends StatelessWidget {
     final bool narrow = w < 720;
     return Stack(
       children: <Widget>[
-        for (final ScrollQuote q in kScrollQuotes)
-          _buildQuote(q, narrow, w),
+        for (final ScrollQuote q in quotes) _buildQuote(q, narrow, w),
       ],
     );
   }
@@ -95,8 +104,9 @@ class ScrollQuotes extends StatelessWidget {
           constraints: BoxConstraints(maxWidth: maxW),
           child: Text(
             q.text,
-            textAlign:
-                q.side == QuoteSide.left ? TextAlign.left : TextAlign.right,
+            textAlign: q.side == QuoteSide.left
+                ? TextAlign.left
+                : TextAlign.right,
             style: GoogleFonts.fraunces(
               fontSize: narrow ? 24 : 38,
               height: 1.25,
@@ -119,8 +129,9 @@ class ScrollQuotes extends StatelessWidget {
       );
     }
     return Align(
-      alignment:
-          q.side == QuoteSide.left ? const Alignment(-0.9, 0) : const Alignment(0.9, 0),
+      alignment: q.side == QuoteSide.left
+          ? const Alignment(-0.9, 0)
+          : const Alignment(0.9, 0),
       child: block,
     );
   }

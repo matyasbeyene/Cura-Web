@@ -18,51 +18,54 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   final AnalyticsService _svc = AnalyticsService();
 
-  bool _loadingBiz = true;
-  String? _bizError;
-  List<OwnedBusiness> _businesses = const <OwnedBusiness>[];
-  OwnedBusiness? _selected;
+  bool _loadingBusiness = true;
+  String? _businessError;
+  OwnedBusiness? _business;
 
   DatePreset _preset = DatePreset.thirtyDays;
   TrendMetric _trendMetric = TrendMetric.sessions;
   Future<DashboardBundle>? _bundleFuture;
+  final Set<String> _busyOfferIds = <String>{};
+  bool _creatingOffer = false;
 
   bool get _signedIn => Supabase.instance.client.auth.currentUser != null;
 
   @override
   void initState() {
     super.initState();
-    if (_signedIn) _loadBusinesses();
+    if (_signedIn) _loadBusiness();
   }
 
-  Future<void> _loadBusinesses() async {
+  Future<void> _loadBusiness() async {
     setState(() {
-      _loadingBiz = true;
-      _bizError = null;
+      _loadingBusiness = true;
+      _businessError = null;
     });
     try {
-      final biz = await _svc.fetchMyBusinesses();
+      final business = await _svc.fetchMyBusiness();
       if (!mounted) return;
       setState(() {
-        _businesses = biz;
-        _selected = biz.isNotEmpty ? biz.first : null;
-        _loadingBiz = false;
+        _business = business;
+        _loadingBusiness = false;
       });
-      if (_selected != null) _loadBundle();
+      if (_business != null) _loadBundle();
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _loadingBiz = false;
-        _bizError = e.toString();
+        _loadingBusiness = false;
+        _businessError = e.toString();
       });
     }
   }
 
   void _loadBundle() {
-    final business = _selected;
+    final business = _business;
     if (business == null) return;
     setState(() {
-      _bundleFuture = _svc.fetchBundle(businessId: business.id, preset: _preset);
+      _bundleFuture = _svc.fetchBundle(
+        businessId: business.id,
+        preset: _preset,
+      );
     });
   }
 
@@ -78,6 +81,11 @@ class _DashboardPageState extends State<DashboardPage> {
     if (p <= 0) return null;
     return (pick(b.current.totals) - p) / p * 100;
   }
+
+  String get _signInForDashboard => Uri(
+    path: '/sign-in',
+    queryParameters: const <String, String>{'redirect': '/dashboard'},
+  ).toString();
 
   @override
   Widget build(BuildContext context) {
@@ -101,20 +109,20 @@ class _DashboardPageState extends State<DashboardPage> {
         title: 'Sign in to view your dashboard',
         body: 'The business portal is for Cura partner businesses.',
         actionLabel: 'Sign in',
-        onAction: () => context.push('/sign-in'),
+        onAction: () => context.go(_signInForDashboard),
       );
     }
-    if (_loadingBiz) return const _LoadingState();
-    if (_bizError != null) {
+    if (_loadingBusiness) return const _LoadingState();
+    if (_businessError != null) {
       return _Centered(
         icon: Icons.error_outline_rounded,
         title: 'Couldn\'t load your dashboard',
-        body: _bizError!,
+        body: _businessError!,
         actionLabel: 'Try again',
-        onAction: _loadBusinesses,
+        onAction: _loadBusiness,
       );
     }
-    if (_businesses.isEmpty) {
+    if (_business == null) {
       return _Centered(
         icon: Icons.storefront_outlined,
         title: 'No business on this account',
@@ -128,107 +136,149 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _dashboard() {
-    return SingleChildScrollView(
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1180),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 64),
-            child: FutureBuilder<DashboardBundle>(
-              future: _bundleFuture,
-              builder: (context, snap) {
-                final header = _header(snap.data);
-                if (snap.connectionState == ConnectionState.waiting) {
-                  return Column(children: <Widget>[header, const SizedBox(height: 24), const _LoadingState(compact: true)]);
-                }
-                if (snap.hasError) {
-                  return Column(children: <Widget>[
-                    header,
-                    const SizedBox(height: 24),
-                    _Centered(
-                      icon: Icons.error_outline_rounded,
-                      title: 'Couldn\'t load analytics',
-                      body: snap.error.toString(),
-                      actionLabel: 'Retry',
-                      onAction: _loadBundle,
-                      embedded: true,
-                    ),
-                  ]);
-                }
-                final bundle = snap.data!;
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
-                    header,
-                    const SizedBox(height: 24),
-                    ..._sections(bundle),
-                  ],
-                );
-              },
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool narrow = constraints.maxWidth < 700;
+        final EdgeInsets padding = EdgeInsets.fromLTRB(
+          narrow ? 14 : 24,
+          narrow ? 16 : 24,
+          narrow ? 14 : 24,
+          64,
+        );
+        return Scrollbar(
+          child: SingleChildScrollView(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1280),
+                child: Padding(
+                  padding: padding,
+                  child: FutureBuilder<DashboardBundle>(
+                    future: _bundleFuture,
+                    builder: (context, snap) {
+                      final header = _header(snap.data);
+                      if (snap.connectionState == ConnectionState.waiting) {
+                        return Column(
+                          children: <Widget>[
+                            header,
+                            const SizedBox(height: 24),
+                            const _LoadingState(compact: true),
+                          ],
+                        );
+                      }
+                      if (snap.hasError) {
+                        return Column(
+                          children: <Widget>[
+                            header,
+                            const SizedBox(height: 24),
+                            _Centered(
+                              icon: Icons.error_outline_rounded,
+                              title: 'Couldn\'t load analytics',
+                              body: snap.error.toString(),
+                              actionLabel: 'Retry',
+                              onAction: _loadBundle,
+                              embedded: true,
+                            ),
+                          ],
+                        );
+                      }
+                      if (!snap.hasData) {
+                        return Column(
+                          children: <Widget>[
+                            header,
+                            const SizedBox(height: 24),
+                            const _LoadingState(compact: true),
+                          ],
+                        );
+                      }
+                      final bundle = snap.data!;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: <Widget>[
+                          header,
+                          const SizedBox(height: 24),
+                          ..._sections(bundle),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
   Widget _header(DashboardBundle? bundle) {
-    final business = _selected!;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Wrap(
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: 16,
-          runSpacing: 12,
+    final business = _business!;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool narrow = constraints.maxWidth < 760;
+        final title = Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: <Widget>[
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  business.name.isEmpty ? 'Your business' : business.name,
-                  style: GoogleFonts.fraunces(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w600,
-                    height: 1.05,
-                    color: AppColors.warmBlack,
+            _BusinessAvatar(business: business),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    business.name.isEmpty ? 'Your business' : business.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      fontSize: narrow ? 28 : 34,
+                      fontWeight: FontWeight.w700,
+                      height: 1.08,
+                      letterSpacing: 0,
+                      color: AppColors.warmBlack,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  business.category.isEmpty
-                      ? 'Business analytics'
-                      : business.category,
-                  style: GoogleFonts.inter(fontSize: 14, color: AppColors.mocha),
-                ),
-              ],
-            ),
-          ],
-        ),
-        const SizedBox(height: 18),
-        Row(
-          children: <Widget>[
-            _Segmented<DatePreset>(
-              value: _preset,
-              options: const <(String, DatePreset)>[
-                ('7 days', DatePreset.sevenDays),
-                ('30 days', DatePreset.thirtyDays),
-                ('90 days', DatePreset.ninetyDays),
-              ],
-              onChanged: (p) {
-                setState(() => _preset = p);
-                _loadBundle();
-              },
-            ),
-            const Spacer(),
-            if (bundle != null)
-              Text(
-                'Updated ${_timeAgo(bundle.current.generatedAt)}',
-                style: GoogleFonts.inter(fontSize: 12, color: AppColors.mocha),
+                  const SizedBox(height: 5),
+                  Text(
+                    business.category.isEmpty
+                        ? 'Business analytics'
+                        : business.category,
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      color: AppColors.mocha,
+                    ),
+                  ),
+                ],
               ),
+            ),
           ],
-        ),
-      ],
+        );
+
+        final controls = _HeaderControls(
+          preset: _preset,
+          onPresetChanged: (p) {
+            setState(() => _preset = p);
+            _loadBundle();
+          },
+          stacked: narrow,
+        );
+
+        if (narrow) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[title, const SizedBox(height: 16), controls],
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Expanded(child: title),
+            const SizedBox(width: 20),
+            Flexible(
+              child: Align(alignment: Alignment.topRight, child: controls),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -236,9 +286,12 @@ class _DashboardPageState extends State<DashboardPage> {
     final t = bundle.current.totals;
     final data = bundle.current;
     return <Widget>[
-      // KPI grid
+      _SnapshotCard(bundle: bundle, preset: _preset),
+      const SizedBox(height: 14),
       _grid(
-        minWidth: 220,
+        minWidth: 210,
+        gap: 14,
+        itemHeight: 176,
         children: <Widget>[
           KpiCard(
             label: 'Unique students',
@@ -267,8 +320,9 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
           KpiCard(
             label: 'Focus hours',
-            value: compactInt(t.focusHours),
+            value: _formatHours(t.focusHours),
             icon: Icons.schedule_outlined,
+            caption: '${compactInt(t.focusMinutes)} focus minutes',
             deltaPct: _delta(bundle, (x) => x.focusMinutes),
           ),
           KpiCard(
@@ -277,11 +331,16 @@ class _DashboardPageState extends State<DashboardPage> {
             icon: Icons.bolt_outlined,
             caption: 'active sessions',
           ),
+          KpiCard(
+            label: 'Peak time',
+            value: _peakHourText(t.peakHour),
+            icon: Icons.access_time_rounded,
+            caption: _peakHourCaption(t.peakHour),
+          ),
         ],
       ),
       const SizedBox(height: 16),
 
-      // Trend
       DashboardCard(
         title: 'Visits over time',
         subtitle: 'Last ${_preset.days} days',
@@ -295,17 +354,25 @@ class _DashboardPageState extends State<DashboardPage> {
           ],
           onChanged: (m) => setState(() => _trendMetric = m),
         ),
-        child: TrendChart(trend: data.trend, metric: _trendMetric),
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 180),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          child: TrendChart(
+            key: ValueKey<TrendMetric>(_trendMetric),
+            trend: data.trend,
+            metric: _trendMetric,
+          ),
+        ),
       ),
       const SizedBox(height: 16),
 
-      // Peak hours + session length
       _grid(
-        minWidth: 340,
+        minWidth: 360,
         children: <Widget>[
           DashboardCard(
             title: 'When students study',
-            subtitle: 'Busier cells = more sessions',
+            subtitle: 'Busier cells = more sessions. Tap or hover for details.',
             child: PeakHoursHeatmap(cells: data.hourly),
           ),
           DashboardCard(
@@ -318,115 +385,648 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
         ],
       ),
-      const SizedBox(height: 16),
+      const SizedBox(height: 22),
 
-      // Demographics
-      Text(
-        'Who studies here',
-        style: GoogleFonts.fraunces(
-          fontSize: 22,
-          fontWeight: FontWeight.w600,
-          color: AppColors.warmBlack,
-        ),
-      ),
-      const SizedBox(height: 4),
-      Text(
-        'Aggregated and privacy-safe — small groups are hidden.',
-        style: GoogleFonts.inter(fontSize: 13, color: AppColors.mocha),
+      _SectionHeader(
+        title: 'Who studies here',
+        subtitle: 'Aggregated and privacy-safe. Small groups are hidden.',
       ),
       const SizedBox(height: 14),
       _grid(
-        minWidth: 320,
+        minWidth: 310,
         children: <Widget>[
           DashboardCard(
             title: 'Level of study',
             child: BreakdownList(
-                items: data.level, privacyThreshold: data.privacyThreshold),
+              items: data.level,
+              privacyThreshold: data.privacyThreshold,
+            ),
           ),
           DashboardCard(
             title: 'Year',
             child: BreakdownList(
-                items: data.year, privacyThreshold: data.privacyThreshold),
+              items: data.year,
+              privacyThreshold: data.privacyThreshold,
+            ),
           ),
           DashboardCard(
             title: 'Top majors',
             child: BreakdownList(
-                items: data.major, privacyThreshold: data.privacyThreshold),
+              items: data.major,
+              privacyThreshold: data.privacyThreshold,
+            ),
           ),
           DashboardCard(
             title: 'Gender',
             child: BreakdownList(
-                items: data.gender, privacyThreshold: data.privacyThreshold),
+              items: data.gender,
+              privacyThreshold: data.privacyThreshold,
+            ),
           ),
         ],
       ),
-      const SizedBox(height: 16),
+      const SizedBox(height: 22),
 
-      // Deals
-      if (data.deals.isNotEmpty) ...<Widget>[
-        Text(
-          'Reward performance',
-          style: GoogleFonts.fraunces(
-            fontSize: 22,
-            fontWeight: FontWeight.w600,
-            color: AppColors.warmBlack,
+      _SectionHeader(
+        title: 'Reward performance',
+        subtitle: 'Offer starts, unlocks, and average progress.',
+        trailing: FilledButton.icon(
+          onPressed: _creatingOffer ? null : () => _editOffer(),
+          icon: const Icon(Icons.add_rounded, size: 18),
+          label: const Text('New offer'),
+          style: FilledButton.styleFrom(
+            backgroundColor: AppColors.espresso,
+            foregroundColor: AppColors.cream,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         ),
-        const SizedBox(height: 14),
+      ),
+      const SizedBox(height: 14),
+      if (data.deals.isEmpty)
+        const DashboardCard(
+          child: DashboardEmptyState(
+            icon: Icons.card_giftcard_outlined,
+            message: 'No offers yet. Add one to start rewarding study time.',
+          ),
+        )
+      else
         _grid(
-          minWidth: 300,
+          minWidth: 310,
+          gap: 14,
+          itemHeight: 420,
           children: <Widget>[
-            for (final deal in data.deals) DealCard(deal: deal),
+            for (final deal in data.deals)
+              DealCard(
+                deal: deal,
+                busy: _busyOfferIds.contains(deal.id),
+                onEdit: deal.id.isEmpty ? null : () => _editOffer(deal: deal),
+                onToggleActive: deal.id.isEmpty
+                    ? null
+                    : () => _toggleOfferActive(deal),
+                onDelete: deal.id.isEmpty ? null : () => _deleteOffer(deal),
+              ),
           ],
         ),
-        const SizedBox(height: 16),
-      ],
+      const SizedBox(height: 22),
 
-      // Insights
-      if (data.insights.isNotEmpty) ...<Widget>[
-        Text(
-          'Insights',
-          style: GoogleFonts.fraunces(
-            fontSize: 22,
-            fontWeight: FontWeight.w600,
-            color: AppColors.warmBlack,
+      _SectionHeader(
+        title: 'Insights',
+        subtitle: 'Plain-English takeaways from the analytics payload.',
+      ),
+      const SizedBox(height: 14),
+      if (data.insights.isEmpty)
+        const DashboardCard(
+          child: DashboardEmptyState(
+            icon: Icons.auto_awesome_outlined,
+            message: 'No generated insights for this period yet.',
           ),
+        )
+      else
+        _grid(
+          minWidth: 360,
+          children: <Widget>[
+            for (final insight in data.insights) InsightCard(insight: insight),
+          ],
         ),
-        const SizedBox(height: 14),
-        for (final insight in data.insights)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: InsightCard(insight: insight),
-          ),
-      ],
     ];
   }
 
+  String _formatHours(double hours) {
+    if (hours >= 100) return compactInt(hours);
+    if (hours % 1 == 0) return hours.toStringAsFixed(0);
+    return hours.toStringAsFixed(1);
+  }
+
   /// Responsive wrap: items flow into as many columns as fit [minWidth].
-  Widget _grid({required List<Widget> children, required double minWidth, double gap = 16}) {
+  Widget _grid({
+    required List<Widget> children,
+    required double minWidth,
+    double gap = 16,
+    double? itemHeight,
+  }) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final double maxW = constraints.maxWidth;
-        int cols = (maxW / minWidth).floor().clamp(1, children.isEmpty ? 1 : children.length);
+        int cols = ((maxW + gap) / (minWidth + gap)).floor().clamp(
+          1,
+          children.isEmpty ? 1 : children.length,
+        );
         if (cols < 1) cols = 1;
         final double itemW = (maxW - gap * (cols - 1)) / cols;
         return Wrap(
           spacing: gap,
           runSpacing: gap,
           children: <Widget>[
-            for (final child in children) SizedBox(width: itemW, child: child),
+            for (final child in children)
+              SizedBox(width: itemW, height: itemHeight, child: child),
           ],
         );
       },
     );
   }
 
-  String _timeAgo(DateTime t) {
-    final d = DateTime.now().difference(t);
-    if (d.inMinutes < 1) return 'just now';
-    if (d.inMinutes < 60) return '${d.inMinutes}m ago';
-    if (d.inHours < 24) return '${d.inHours}h ago';
-    return '${d.inDays}d ago';
+  Future<void> _editOffer({DealPerformance? deal}) async {
+    final business = _business;
+    if (business == null) return;
+
+    final result = await showDialog<_OfferFormValue>(
+      context: context,
+      builder: (context) => _OfferEditorDialog(deal: deal),
+    );
+    if (result == null) return;
+
+    final String busyKey = deal?.id ?? '__new_offer__';
+    setState(() {
+      if (deal == null) _creatingOffer = true;
+      _busyOfferIds.add(busyKey);
+    });
+
+    try {
+      await _svc.saveOffer(
+        id: deal?.id,
+        businessId: business.id,
+        title: result.title,
+        description: result.description,
+        requiredMinutes: result.requiredMinutes,
+        isActive: result.isActive,
+      );
+      if (!mounted) return;
+      _showDashboardMessage(deal == null ? 'Offer added.' : 'Offer updated.');
+      _loadBundle();
+    } catch (e) {
+      if (!mounted) return;
+      _showDashboardMessage(e.toString());
+    } finally {
+      if (mounted) {
+        setState(() {
+          _creatingOffer = false;
+          _busyOfferIds.remove(busyKey);
+        });
+      }
+    }
+  }
+
+  Future<void> _toggleOfferActive(DealPerformance deal) async {
+    setState(() => _busyOfferIds.add(deal.id));
+    try {
+      await _svc.setOfferActive(
+        id: deal.id,
+        businessId: deal.businessId,
+        isActive: !deal.isActive,
+      );
+      if (!mounted) return;
+      _showDashboardMessage(
+        deal.isActive ? 'Offer paused.' : 'Offer activated.',
+      );
+      _loadBundle();
+    } catch (e) {
+      if (!mounted) return;
+      _showDashboardMessage(e.toString());
+    } finally {
+      if (mounted) {
+        setState(() => _busyOfferIds.remove(deal.id));
+      }
+    }
+  }
+
+  Future<void> _deleteOffer(DealPerformance deal) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete offer?'),
+        content: Text(
+          'This removes "${deal.title}" from your business dashboard and the student app.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF9F1D18),
+              foregroundColor: AppColors.white,
+            ),
+            child: const Text('Delete offer'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _busyOfferIds.add(deal.id));
+    try {
+      await _svc.deleteOffer(id: deal.id, businessId: deal.businessId);
+      if (!mounted) return;
+      _showDashboardMessage('Offer deleted.');
+      _loadBundle();
+    } catch (e) {
+      if (!mounted) return;
+      _showDashboardMessage(e.toString());
+    } finally {
+      if (mounted) {
+        setState(() => _busyOfferIds.remove(deal.id));
+      }
+    }
+  }
+
+  void _showDashboardMessage(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  String _peakHourText(String value) {
+    if (_isNoClearPeak(value)) return 'no clear peak yet';
+    return value;
+  }
+
+  String _peakHourCaption(String value) {
+    if (_isNoClearPeak(value)) return 'more visits needed';
+    return 'busiest study window';
+  }
+
+  bool _isNoClearPeak(String value) {
+    return value.trim().toLowerCase().startsWith('no clear peak');
+  }
+}
+
+class _SnapshotCard extends StatelessWidget {
+  const _SnapshotCard({required this.bundle, required this.preset});
+
+  final DashboardBundle bundle;
+  final DatePreset preset;
+
+  @override
+  Widget build(BuildContext context) {
+    final totals = bundle.current.totals;
+    final String hours = _formatHours(totals.focusHours);
+    return DashboardCard(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            'Dashboard snapshot',
+            style: GoogleFonts.fraunces(
+              fontSize: 24,
+              fontWeight: FontWeight.w600,
+              color: AppColors.warmBlack,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Cura recorded ${compactInt(totals.sessions)} '
+            '${_plural(totals.sessions, 'study session')} from '
+            '${compactInt(totals.uniqueStudents)} '
+            '${_plural(totals.uniqueStudents, 'student')}, adding up to '
+            '$hours ${_plural(totals.focusHours, 'focus hour')}.',
+            style: GoogleFonts.inter(
+              fontSize: 15,
+              height: 1.55,
+              color: AppColors.mocha,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatHours(double hours) {
+    if (hours >= 100) return compactInt(hours);
+    if (hours % 1 == 0) return hours.toStringAsFixed(0);
+    return hours.toStringAsFixed(1);
+  }
+
+  String _plural(num value, String singular) {
+    if (value == 1) return singular;
+    return '${singular}s';
+  }
+}
+
+class _OfferFormValue {
+  const _OfferFormValue({
+    required this.title,
+    required this.description,
+    required this.requiredMinutes,
+    required this.isActive,
+  });
+
+  final String title;
+  final String description;
+  final int requiredMinutes;
+  final bool isActive;
+}
+
+class _OfferEditorDialog extends StatefulWidget {
+  const _OfferEditorDialog({this.deal});
+
+  final DealPerformance? deal;
+
+  @override
+  State<_OfferEditorDialog> createState() => _OfferEditorDialogState();
+}
+
+class _OfferEditorDialogState extends State<_OfferEditorDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _title;
+  late final TextEditingController _description;
+  late final TextEditingController _hours;
+  late bool _isActive;
+
+  @override
+  void initState() {
+    super.initState();
+    final deal = widget.deal;
+    _title = TextEditingController(text: deal?.title ?? '');
+    _description = TextEditingController(text: deal?.description ?? '');
+    _hours = TextEditingController(
+      text: deal == null ? '' : _formatHoursForInput(deal.requiredHours),
+    );
+    _isActive = deal?.isActive ?? true;
+  }
+
+  @override
+  void dispose() {
+    _title.dispose();
+    _description.dispose();
+    _hours.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final editing = widget.deal != null;
+    return AlertDialog(
+      title: Text(editing ? 'Edit offer' : 'New offer'),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 460),
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                TextFormField(
+                  controller: _title,
+                  textInputAction: TextInputAction.next,
+                  decoration: const InputDecoration(
+                    labelText: 'Offer title',
+                    hintText: 'Free latte after focused study',
+                  ),
+                  validator: (value) {
+                    final text = value?.trim() ?? '';
+                    if (text.isEmpty) return 'Add an offer title.';
+                    if (text.length > 120) {
+                      return 'Use 120 characters or fewer.';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _description,
+                  minLines: 2,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    labelText: 'Description',
+                    hintText: 'Tell students what they can unlock.',
+                  ),
+                  validator: (value) {
+                    final text = value?.trim() ?? '';
+                    if (text.length > 500) {
+                      return 'Use 500 characters or fewer.';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _hours,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'Study time required',
+                    suffixText: 'hours',
+                    helperText: 'Example: 2.5 means 2 hours 30 minutes.',
+                  ),
+                  validator: (value) {
+                    final hours = double.tryParse(value?.trim() ?? '');
+                    if (hours == null || hours <= 0) {
+                      return 'Enter a study time above 0.';
+                    }
+                    if ((hours * 60).round() > 100000) {
+                      return 'Use a smaller study time.';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 10),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _isActive,
+                  onChanged: (value) => setState(() => _isActive = value),
+                  title: Text(
+                    _isActive ? 'Offer is active' : 'Offer is paused',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.espresso,
+                    ),
+                  ),
+                  subtitle: Text(
+                    _isActive
+                        ? 'Students can see and unlock this offer.'
+                        : 'Students will not see this offer.',
+                    style: GoogleFonts.inter(
+                      fontSize: 12.5,
+                      color: AppColors.mocha,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          style: FilledButton.styleFrom(
+            backgroundColor: AppColors.espresso,
+            foregroundColor: AppColors.cream,
+          ),
+          child: Text(editing ? 'Save changes' : 'Add offer'),
+        ),
+      ],
+    );
+  }
+
+  void _submit() {
+    if (_formKey.currentState?.validate() != true) return;
+    final hours = double.parse(_hours.text.trim());
+    Navigator.of(context).pop(
+      _OfferFormValue(
+        title: _title.text.trim(),
+        description: _description.text.trim(),
+        requiredMinutes: (hours * 60).round().clamp(1, 100000),
+        isActive: _isActive,
+      ),
+    );
+  }
+
+  String _formatHoursForInput(double hours) {
+    if (hours % 1 == 0) return hours.toStringAsFixed(0);
+    return hours.toStringAsFixed(2).replaceFirst(RegExp(r'0+$'), '');
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({
+    required this.title,
+    required this.subtitle,
+    this.trailing,
+  });
+
+  final String title;
+  final String subtitle;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final titleBlock = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          title,
+          style: GoogleFonts.fraunces(
+            fontSize: 23,
+            fontWeight: FontWeight.w600,
+            color: AppColors.warmBlack,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          subtitle,
+          style: GoogleFonts.inter(
+            fontSize: 13,
+            height: 1.4,
+            color: AppColors.mocha,
+          ),
+        ),
+      ],
+    );
+    if (trailing == null) return titleBlock;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 620) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              titleBlock,
+              const SizedBox(height: 12),
+              Align(alignment: Alignment.centerLeft, child: trailing),
+            ],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: <Widget>[
+            Expanded(child: titleBlock),
+            const SizedBox(width: 16),
+            trailing!,
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _BusinessAvatar extends StatelessWidget {
+  const _BusinessAvatar({required this.business});
+
+  final OwnedBusiness business;
+
+  @override
+  Widget build(BuildContext context) {
+    final imageUrl = business.imageUrl;
+    return Container(
+      width: 54,
+      height: 54,
+      decoration: BoxDecoration(
+        color: AppColors.latte.withValues(alpha: 0.65),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.espresso.withValues(alpha: 0.08)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: imageUrl == null || imageUrl.isEmpty
+          ? const Icon(Icons.storefront_rounded, color: AppColors.espresso)
+          : Image.network(
+              imageUrl,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => const Icon(
+                Icons.storefront_rounded,
+                color: AppColors.espresso,
+              ),
+            ),
+    );
+  }
+}
+
+class _HeaderControls extends StatelessWidget {
+  const _HeaderControls({
+    required this.preset,
+    required this.onPresetChanged,
+    required this.stacked,
+  });
+
+  final DatePreset preset;
+  final ValueChanged<DatePreset> onPresetChanged;
+  final bool stacked;
+
+  @override
+  Widget build(BuildContext context) {
+    final children = <Widget>[
+      _Segmented<DatePreset>(
+        value: preset,
+        options: const <(String, DatePreset)>[
+          ('7 days', DatePreset.sevenDays),
+          ('30 days', DatePreset.thirtyDays),
+          ('90 days', DatePreset.ninetyDays),
+        ],
+        onChanged: onPresetChanged,
+      ),
+    ];
+
+    if (stacked) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          for (int i = 0; i < children.length; i++) ...<Widget>[
+            children[i],
+            if (i != children.length - 1) const SizedBox(height: 10),
+          ],
+        ],
+      );
+    }
+
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      alignment: WrapAlignment.end,
+      children: children,
+    );
   }
 }
 
@@ -463,8 +1063,10 @@ class _TopBar extends StatelessWidget {
                   ),
                   const SizedBox(width: 10),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.forest.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(6),
@@ -511,47 +1113,61 @@ class _Segmented<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: AppColors.espresso.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          for (final (label, val) in options)
-            GestureDetector(
-              onTap: () => onChanged(val),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 160),
-                padding: EdgeInsets.symmetric(
-                    horizontal: compact ? 12 : 16, vertical: compact ? 7 : 9),
-                decoration: BoxDecoration(
-                  color: val == value ? AppColors.white : Colors.transparent,
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: val == value
-                      ? <BoxShadow>[
-                          BoxShadow(
-                            color: AppColors.espresso.withValues(alpha: 0.10),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Text(
-                  label,
-                  style: GoogleFonts.inter(
-                    fontSize: compact ? 12.5 : 13.5,
-                    fontWeight: FontWeight.w600,
-                    color:
-                        val == value ? AppColors.espresso : AppColors.mocha,
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Container(
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          color: AppColors.espresso.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            for (final (label, val) in options)
+              MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => onChanged(val),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 160),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: compact ? 12 : 16,
+                      vertical: compact ? 7 : 9,
+                    ),
+                    decoration: BoxDecoration(
+                      color: val == value
+                          ? AppColors.white
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: val == value
+                          ? <BoxShadow>[
+                              BoxShadow(
+                                color: AppColors.espresso.withValues(
+                                  alpha: 0.10,
+                                ),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: Text(
+                      label,
+                      style: GoogleFonts.inter(
+                        fontSize: compact ? 12.5 : 13.5,
+                        fontWeight: FontWeight.w600,
+                        color: val == value
+                            ? AppColors.espresso
+                            : AppColors.mocha,
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -605,7 +1221,10 @@ class _Centered extends StatelessWidget {
             body,
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(
-                fontSize: 14.5, height: 1.55, color: AppColors.mocha),
+              fontSize: 14.5,
+              height: 1.55,
+              color: AppColors.mocha,
+            ),
           ),
           const SizedBox(height: 24),
           FilledButton(
@@ -613,20 +1232,28 @@ class _Centered extends StatelessWidget {
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.forest,
               foregroundColor: AppColors.cream,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 26, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 16),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
-            child: Text(actionLabel,
-                style: GoogleFonts.inter(
-                    fontSize: 15, fontWeight: FontWeight.w600)),
+            child: Text(
+              actionLabel,
+              style: GoogleFonts.inter(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
     );
-    if (embedded) return Padding(padding: const EdgeInsets.all(40), child: content);
-    return Center(child: Padding(padding: const EdgeInsets.all(24), child: content));
+    if (embedded) {
+      return Padding(padding: const EdgeInsets.all(40), child: content);
+    }
+    return Center(
+      child: Padding(padding: const EdgeInsets.all(24), child: content),
+    );
   }
 }
 
@@ -644,7 +1271,11 @@ class _LoadingState extends StatelessWidget {
           runSpacing: 16,
           children: <Widget>[
             for (int i = 0; i < 6; i++)
-              const SizedBox(width: 220, height: 130, child: SkeletonBox(height: 130)),
+              const SizedBox(
+                width: 220,
+                height: 130,
+                child: SkeletonBox(height: 130),
+              ),
           ],
         ),
         const SizedBox(height: 16),

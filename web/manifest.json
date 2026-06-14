@@ -1,11 +1,11 @@
 {
-    "name": "coffee_landing",
-    "short_name": "coffee_landing",
+    "name": "Cura",
+    "short_name": "Cura",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#D2D2D2",
+    "theme_color": "#3B2A20",
+    "description": "Find study-friendly places, stay focused, and earn rewards with Cura.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

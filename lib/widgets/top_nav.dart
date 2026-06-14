@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../theme/app_theme.dart';
 
+enum SiteAudience { student, business }
+
 /// Sticky top navigation. Transparent over the hero, fading into a solid cream
 /// bar as you scroll ([scrolled] 0 -> 1). Text stays dark (the hero border and
 /// the content sections are both light).
@@ -10,14 +12,14 @@ class TopNav extends StatelessWidget {
   const TopNav({
     super.key,
     required this.scrolled,
-    this.onSignIn,
-    this.onGetApp,
+    required this.audience,
+    required this.onAudienceChanged,
     this.onDashboard,
   });
 
   final double scrolled;
-  final VoidCallback? onSignIn;
-  final VoidCallback? onGetApp;
+  final SiteAudience audience;
+  final ValueChanged<SiteAudience> onAudienceChanged;
   final VoidCallback? onDashboard;
 
   @override
@@ -26,6 +28,8 @@ class TopNav extends StatelessWidget {
     final Color barColor = AppColors.cream.withValues(alpha: 0.94 * t);
     const Color fg = AppColors.espresso;
     final bool wide = MediaQuery.of(context).size.width >= 760;
+    final bool compact = MediaQuery.of(context).size.width < 390;
+    final bool businessView = audience == SiteAudience.business;
 
     return Container(
       color: barColor,
@@ -36,37 +40,31 @@ class TopNav extends StatelessWidget {
           height: 74,
           child: Row(
             children: <Widget>[
-              // Wordmark: the Cura logo. Drop a transparent PNG at
-              // web/media/logo.png; until then it falls back to "Cura" text.
-              Image.network(
-                Uri.base.resolve('media/logo.png').toString(),
-                height: 40,
-                filterQuality: FilterQuality.high,
-                errorBuilder:
-                    (BuildContext context, Object error, StackTrace? stack) {
-                  return Text(
-                    'Cura',
-                    style: GoogleFonts.fraunces(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.5,
-                      color: fg,
-                    ),
-                  );
-                },
+              Text(
+                'Cura',
+                style: GoogleFonts.fraunces(
+                  fontSize: wide ? 28 : 26,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.4,
+                  color: fg,
+                ),
               ),
               const Spacer(),
-              if (wide) ...<Widget>[
-                _NavLink(label: 'Home', color: fg),
-                _NavLink(label: 'Features', color: fg),
-                _NavLink(label: 'Dashboard', color: fg, onTap: onDashboard),
-                const SizedBox(width: 16),
-              ],
-              // Sign in now uses the forest-green color the CTA used to have.
-              _SolidButton(label: 'Sign in', onTap: onSignIn),
-              const SizedBox(width: 12),
-              // Get the app is the App Store badge.
-              AppStoreBadge(onTap: onGetApp),
+              if (businessView) ...<Widget>[
+                _AudienceButton(
+                  label: compact ? 'Students' : 'For Students',
+                  icon: Icons.school_rounded,
+                  onTap: () => onAudienceChanged(SiteAudience.student),
+                  compact: compact,
+                ),
+                SizedBox(width: compact ? 8 : 10),
+                _DashboardButton(onTap: onDashboard, compact: compact),
+              ] else
+                _BusinessButton(
+                  label: compact ? 'Businesses' : 'For Businesses',
+                  onTap: () => onAudienceChanged(SiteAudience.business),
+                  compact: compact,
+                ),
             ],
           ),
         ),
@@ -75,53 +73,99 @@ class TopNav extends StatelessWidget {
   }
 }
 
-class _NavLink extends StatelessWidget {
-  const _NavLink({required this.label, required this.color, this.onTap});
+class _BusinessButton extends StatelessWidget {
+  const _BusinessButton({
+    required this.label,
+    required this.onTap,
+    required this.compact,
+  });
 
   final String label;
-  final Color color;
-  final VoidCallback? onTap;
+  final VoidCallback onTap;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: onTap ?? () {},
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          child: Text(
-            label,
-            style: GoogleFonts.inter(
-              fontSize: 15,
-              fontWeight: FontWeight.w500,
-              color: color,
-            ),
-          ),
+    return FilledButton.icon(
+      onPressed: onTap,
+      style: FilledButton.styleFrom(
+        backgroundColor: AppColors.espresso,
+        foregroundColor: AppColors.cream,
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 12 : 18,
+          vertical: 14,
         ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        side: BorderSide(color: AppColors.latte.withValues(alpha: 0.55)),
+      ),
+      icon: Icon(Icons.storefront_rounded, size: compact ? 16 : 18),
+      label: Text(
+        label,
+        style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600),
       ),
     );
   }
 }
 
-class _SolidButton extends StatelessWidget {
-  const _SolidButton({required this.label, this.onTap});
+class _AudienceButton extends StatelessWidget {
+  const _AudienceButton({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+    required this.compact,
+  });
 
   final String label;
-  final VoidCallback? onTap;
+  final IconData icon;
+  final VoidCallback onTap;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
-    return FilledButton(
+    return OutlinedButton.icon(
+      onPressed: onTap,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: AppColors.espresso,
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 10 : 16,
+          vertical: 14,
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        side: BorderSide(color: AppColors.espresso.withValues(alpha: 0.24)),
+        backgroundColor: AppColors.cream.withValues(alpha: 0.72),
+      ),
+      icon: Icon(icon, size: compact ? 16 : 18),
+      label: Text(
+        label,
+        style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600),
+      ),
+    );
+  }
+}
+
+class _DashboardButton extends StatelessWidget {
+  const _DashboardButton({this.onTap, required this.compact});
+
+  final VoidCallback? onTap;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    return FilledButton.icon(
       onPressed: onTap ?? () {},
       style: FilledButton.styleFrom(
-        backgroundColor: AppColors.forest,
+        backgroundColor: AppColors.espresso,
         foregroundColor: AppColors.cream,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 12 : 18,
+          vertical: 14,
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        side: BorderSide(color: AppColors.latte.withValues(alpha: 0.55)),
       ),
-      child: Text(
-        label,
+      icon: Icon(Icons.dashboard_rounded, size: compact ? 16 : 18),
+      label: Text(
+        'Dashboard',
         style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600),
       ),
     );
@@ -182,6 +226,31 @@ class AppStoreBadge extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class ContactButton extends StatelessWidget {
+  const ContactButton({super.key, this.onTap});
+
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return FilledButton.icon(
+      onPressed: onTap ?? () {},
+      style: FilledButton.styleFrom(
+        backgroundColor: AppColors.cream,
+        foregroundColor: AppColors.espresso,
+        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        side: BorderSide(color: AppColors.latte.withValues(alpha: 0.55)),
+      ),
+      icon: const Icon(Icons.mail_rounded, size: 18),
+      label: Text(
+        'Contact Us',
+        style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700),
       ),
     );
   }

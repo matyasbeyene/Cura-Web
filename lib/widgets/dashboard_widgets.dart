@@ -16,12 +16,12 @@ String compactInt(num value) {
 }
 
 TextStyle _numStyle(double size, Color color) => GoogleFonts.inter(
-      fontSize: size,
-      fontWeight: FontWeight.w700,
-      color: color,
-      height: 1.0,
-      fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
-    );
+  fontSize: size,
+  fontWeight: FontWeight.w700,
+  color: color,
+  height: 1.0,
+  fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
+);
 
 /// A consistent surface for every dashboard module.
 class DashboardCard extends StatelessWidget {
@@ -60,40 +60,100 @@ class DashboardCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           if (title != null)
-            Row(
-              children: <Widget>[
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        title!,
-                        style: GoogleFonts.fraunces(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.warmBlack,
-                        ),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final titleBlock = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      title!,
+                      style: GoogleFonts.fraunces(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.warmBlack,
                       ),
-                      if (subtitle != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Text(
-                            subtitle!,
-                            style: GoogleFonts.inter(
-                              fontSize: 12.5,
-                              color: AppColors.mocha,
-                            ),
+                    ),
+                    if (subtitle != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          subtitle!,
+                          style: GoogleFonts.inter(
+                            fontSize: 12.5,
+                            color: AppColors.mocha,
                           ),
                         ),
+                      ),
+                  ],
+                );
+                if (trailing == null) return titleBlock;
+                if (constraints.maxWidth < 520) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      titleBlock,
+                      const SizedBox(height: 12),
+                      trailing!,
                     ],
-                  ),
-                ),
-                ?trailing,
-              ],
+                  );
+                }
+                return Row(
+                  children: <Widget>[
+                    Expanded(child: titleBlock),
+                    const SizedBox(width: 12),
+                    Flexible(
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: trailing,
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           if (title != null) const SizedBox(height: 18),
           child,
         ],
+      ),
+    );
+  }
+}
+
+class DashboardEmptyState extends StatelessWidget {
+  const DashboardEmptyState({
+    super.key,
+    required this.icon,
+    required this.message,
+  });
+
+  final IconData icon;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 160),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Icon(
+              icon,
+              size: 28,
+              color: AppColors.mocha.withValues(alpha: 0.55),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                height: 1.45,
+                color: AppColors.mocha,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -123,7 +183,7 @@ class KpiCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DashboardCard(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -143,10 +203,22 @@ class KpiCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 18),
-          Text(value, style: _numStyle(30, AppColors.warmBlack)),
+          SizedBox(
+            height: 34,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(value, style: _numStyle(30, AppColors.warmBlack)),
+              ),
+            ),
+          ),
           const SizedBox(height: 6),
           Text(
             label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: GoogleFonts.inter(
               fontSize: 13,
               fontWeight: FontWeight.w600,
@@ -158,7 +230,12 @@ class KpiCard extends StatelessWidget {
               padding: const EdgeInsets.only(top: 2),
               child: Text(
                 caption!,
-                style: GoogleFonts.inter(fontSize: 11.5, color: AppColors.mocha),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  fontSize: 11.5,
+                  color: AppColors.mocha,
+                ),
               ),
             ),
         ],
@@ -217,10 +294,10 @@ class TrendChart extends StatelessWidget {
   final TrendMetric metric;
 
   double _value(TrendPoint p) => switch (metric) {
-        TrendMetric.sessions => p.sessions.toDouble(),
-        TrendMetric.students => p.uniqueStudents.toDouble(),
-        TrendMetric.minutes => p.focusMinutes.toDouble(),
-      };
+    TrendMetric.sessions => p.sessions.toDouble(),
+    TrendMetric.students => p.uniqueStudents.toDouble(),
+    TrendMetric.minutes => p.focusMinutes.toDouble(),
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -228,9 +305,12 @@ class TrendChart extends StatelessWidget {
       return const _EmptyChart(message: 'No visits in this period yet.');
     }
     final spots = <FlSpot>[
-      for (int i = 0; i < trend.length; i++) FlSpot(i.toDouble(), _value(trend[i])),
+      for (int i = 0; i < trend.length; i++)
+        FlSpot(i.toDouble(), _value(trend[i])),
     ];
-    final double maxY = spots.map((e) => e.y).fold<double>(0, (a, b) => a > b ? a : b);
+    final double maxY = spots
+        .map((e) => e.y)
+        .fold<double>(0, (a, b) => a > b ? a : b);
     final double top = maxY <= 0 ? 4 : maxY * 1.25;
     final int labelEvery = (trend.length / 4).ceil().clamp(1, trend.length);
 
@@ -253,9 +333,12 @@ class TrendChart extends StatelessWidget {
           ),
           borderData: FlBorderData(show: false),
           titlesData: FlTitlesData(
-            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            rightTitles:
-                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
             leftTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
@@ -263,7 +346,10 @@ class TrendChart extends StatelessWidget {
                 interval: top / 4,
                 getTitlesWidget: (value, meta) => Text(
                   compactInt(value),
-                  style: GoogleFonts.inter(fontSize: 10.5, color: AppColors.mocha),
+                  style: GoogleFonts.inter(
+                    fontSize: 10.5,
+                    color: AppColors.mocha,
+                  ),
                 ),
               ),
             ),
@@ -282,8 +368,10 @@ class TrendChart extends StatelessWidget {
                     padding: const EdgeInsets.only(top: 6),
                     child: Text(
                       '${d.month}/${d.day}',
-                      style:
-                          GoogleFonts.inter(fontSize: 10.5, color: AppColors.mocha),
+                      style: GoogleFonts.inter(
+                        fontSize: 10.5,
+                        color: AppColors.mocha,
+                      ),
                     ),
                   );
                 },
@@ -294,14 +382,16 @@ class TrendChart extends StatelessWidget {
             touchTooltipData: LineTouchTooltipData(
               getTooltipColor: (_) => AppColors.espresso,
               getTooltipItems: (spots) => spots
-                  .map((s) => LineTooltipItem(
-                        compactInt(s.y),
-                        GoogleFonts.inter(
-                          color: AppColors.cream,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
-                        ),
-                      ))
+                  .map(
+                    (s) => LineTooltipItem(
+                      compactInt(s.y),
+                      GoogleFonts.inter(
+                        color: AppColors.cream,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                    ),
+                  )
                   .toList(),
             ),
           ),
@@ -338,32 +428,51 @@ class PeakHoursHeatmap extends StatelessWidget {
 
   final List<HourCell> cells;
 
-  static const _days = <String>['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  static const _days = <String>[
+    'Mon',
+    'Tue',
+    'Wed',
+    'Thu',
+    'Fri',
+    'Sat',
+    'Sun',
+  ];
 
   @override
   Widget build(BuildContext context) {
-    final grid = <String, int>{}; // 'weekday-hour' -> sessions
+    final grid = <String, HourCell>{}; // 'weekday-hour' -> cell
     int maxSessions = 0;
     for (final c in cells) {
-      grid['${c.weekday}-${c.hour}'] = c.sessions;
+      grid['${c.weekday}-${c.hour}'] = c;
       if (c.sessions > maxSessions) maxSessions = c.sessions;
     }
     if (maxSessions == 0) {
-      return const _EmptyChart(message: 'Not enough visits to chart peak hours.');
+      return const _EmptyChart(
+        message: 'Not enough visits to chart peak hours.',
+      );
     }
 
     Widget cell(int weekday, int hour) {
-      final s = grid['$weekday-$hour'] ?? 0;
+      final data = grid['$weekday-$hour'];
+      final s = data?.sessions ?? 0;
       final t = s / maxSessions;
-      return Container(
-        width: 15,
-        height: 15,
-        margin: const EdgeInsets.all(1.5),
-        decoration: BoxDecoration(
-          color: s == 0
-              ? AppColors.espresso.withValues(alpha: 0.04)
-              : AppColors.forest.withValues(alpha: 0.18 + 0.82 * t),
-          borderRadius: BorderRadius.circular(4),
+      final double focusHours = (data?.focusMinutes ?? 0) / 60;
+      return Tooltip(
+        message:
+            '${_days[weekday - 1]} ${hour.toString().padLeft(2, '0')}:00\n'
+            '${compactInt(s)} sessions\n'
+            '${focusHours.toStringAsFixed(focusHours >= 10 ? 0 : 1)} focus hours',
+        waitDuration: const Duration(milliseconds: 250),
+        child: Container(
+          width: 15,
+          height: 15,
+          margin: const EdgeInsets.all(1.5),
+          decoration: BoxDecoration(
+            color: s == 0
+                ? AppColors.espresso.withValues(alpha: 0.04)
+                : AppColors.forest.withValues(alpha: 0.18 + 0.82 * t),
+            borderRadius: BorderRadius.circular(4),
+          ),
         ),
       );
     }
@@ -380,8 +489,10 @@ class PeakHoursHeatmap extends StatelessWidget {
                   width: 30,
                   child: Text(
                     _days[wd - 1],
-                    style:
-                        GoogleFonts.inter(fontSize: 10.5, color: AppColors.mocha),
+                    style: GoogleFonts.inter(
+                      fontSize: 10.5,
+                      color: AppColors.mocha,
+                    ),
                   ),
                 ),
                 for (int h = 0; h < 24; h++) cell(wd, h),
@@ -397,7 +508,9 @@ class PeakHoursHeatmap extends StatelessWidget {
                     child: Text(
                       '${h.toString().padLeft(2, '0')}:00',
                       style: GoogleFonts.inter(
-                          fontSize: 10, color: AppColors.mocha),
+                        fontSize: 10,
+                        color: AppColors.mocha,
+                      ),
                     ),
                   ),
               ],
@@ -411,7 +524,11 @@ class PeakHoursHeatmap extends StatelessWidget {
 
 /// Horizontal bar list for a demographic breakdown.
 class BreakdownList extends StatelessWidget {
-  const BreakdownList({super.key, required this.items, this.privacyThreshold = 3});
+  const BreakdownList({
+    super.key,
+    required this.items,
+    this.privacyThreshold = 3,
+  });
 
   final List<BreakdownItem> items;
   final int privacyThreshold;
@@ -421,8 +538,9 @@ class BreakdownList extends StatelessWidget {
     if (items.isEmpty) {
       return _PrivacyNote(threshold: privacyThreshold);
     }
-    final double maxPct =
-        items.map((e) => e.percentage).fold<double>(0, (a, b) => a > b ? a : b);
+    final double maxPct = items
+        .map((e) => e.percentage)
+        .fold<double>(0, (a, b) => a > b ? a : b);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
@@ -445,13 +563,13 @@ class BreakdownList extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      '${item.percentage.toStringAsFixed(0)}%',
+                      '${compactInt(item.count)} / ${item.percentage.toStringAsFixed(0)}%',
                       style: GoogleFonts.inter(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w600,
                         color: AppColors.espresso,
                         fontFeatures: const <FontFeature>[
-                          FontFeature.tabularFigures()
+                          FontFeature.tabularFigures(),
                         ],
                       ),
                     ),
@@ -464,8 +582,9 @@ class BreakdownList extends StatelessWidget {
                     value: maxPct <= 0 ? 0 : (item.percentage / maxPct),
                     minHeight: 8,
                     backgroundColor: AppColors.espresso.withValues(alpha: 0.06),
-                    valueColor:
-                        const AlwaysStoppedAnimation<Color>(AppColors.forest),
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      AppColors.forest,
+                    ),
                   ),
                 ),
               ],
@@ -490,11 +609,15 @@ class _PrivacyNote extends StatelessWidget {
       ),
       child: Row(
         children: <Widget>[
-          const Icon(Icons.lock_outline_rounded, size: 16, color: AppColors.mocha),
+          const Icon(
+            Icons.lock_outline_rounded,
+            size: 16,
+            color: AppColors.mocha,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              'Hidden to protect privacy — groups smaller than $threshold students aren\'t shown.',
+              'Hidden to protect privacy. Groups smaller than $threshold students aren\'t shown.',
               style: GoogleFonts.inter(fontSize: 12.5, color: AppColors.mocha),
             ),
           ),
@@ -506,17 +629,31 @@ class _PrivacyNote extends StatelessWidget {
 
 /// One reward/deal with its progress stats.
 class DealCard extends StatelessWidget {
-  const DealCard({super.key, required this.deal});
+  const DealCard({
+    super.key,
+    required this.deal,
+    this.onEdit,
+    this.onDelete,
+    this.onToggleActive,
+    this.busy = false,
+  });
+
   final DealPerformance deal;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
+  final VoidCallback? onToggleActive;
+  final bool busy;
 
   @override
   Widget build(BuildContext context) {
-    final double conversion =
-        deal.studentsStarted == 0 ? 0 : deal.studentsUnlocked / deal.studentsStarted;
+    final double conversion = deal.studentsStarted == 0
+        ? 0
+        : deal.studentsUnlocked / deal.studentsStarted;
+    final double progress = deal.averageProgress.clamp(0.0, 1.0);
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppColors.cream,
+        color: AppColors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.espresso.withValues(alpha: 0.08)),
       ),
@@ -528,6 +665,8 @@ class DealCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   deal.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.fraunces(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -543,20 +682,163 @@ class DealCard extends StatelessWidget {
             '${deal.requiredHours.toStringAsFixed(deal.requiredHours % 1 == 0 ? 0 : 1)} h to unlock',
             style: GoogleFonts.inter(fontSize: 12, color: AppColors.mocha),
           ),
+          if (deal.description.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                deal.description,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  fontSize: 12.5,
+                  height: 1.45,
+                  color: AppColors.mocha,
+                ),
+              ),
+            ),
           const SizedBox(height: 16),
-          Row(
+          Wrap(
+            spacing: 22,
+            runSpacing: 12,
             children: <Widget>[
-              _MiniStat(value: compactInt(deal.studentsStarted), label: 'Started'),
-              const SizedBox(width: 22),
               _MiniStat(
-                  value: compactInt(deal.studentsUnlocked), label: 'Unlocked'),
-              const SizedBox(width: 22),
+                value: compactInt(deal.studentsStarted),
+                label: 'Started',
+              ),
+              _MiniStat(
+                value: compactInt(deal.studentsUnlocked),
+                label: 'Unlocked',
+              ),
               _MiniStat(
                 value: '${(conversion * 100).toStringAsFixed(0)}%',
                 label: 'Conversion',
               ),
             ],
           ),
+          const SizedBox(height: 16),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 8,
+                    backgroundColor: AppColors.espresso.withValues(alpha: 0.06),
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      AppColors.forest,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                '${(progress * 100).toStringAsFixed(0)}%',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.espresso,
+                  fontFeatures: const <FontFeature>[
+                    FontFeature.tabularFigures(),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Average progress',
+            style: GoogleFonts.inter(fontSize: 11.5, color: AppColors.mocha),
+          ),
+          if (deal.privacyLimited)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Row(
+                children: <Widget>[
+                  const Icon(
+                    Icons.lock_outline_rounded,
+                    size: 14,
+                    color: AppColors.mocha,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Some reward data is hidden for privacy.',
+                      style: GoogleFonts.inter(
+                        fontSize: 11.5,
+                        color: AppColors.mocha,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (onEdit != null || onDelete != null || onToggleActive != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 14),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: <Widget>[
+                  if (onEdit != null)
+                    OutlinedButton.icon(
+                      onPressed: busy ? null : onEdit,
+                      icon: const Icon(Icons.edit_outlined, size: 16),
+                      label: const Text('Edit'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.espresso,
+                        side: BorderSide(
+                          color: AppColors.espresso.withValues(alpha: 0.18),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                  if (onToggleActive != null)
+                    TextButton.icon(
+                      onPressed: busy ? null : onToggleActive,
+                      icon: Icon(
+                        deal.isActive
+                            ? Icons.pause_circle_outline_rounded
+                            : Icons.play_circle_outline_rounded,
+                        size: 16,
+                      ),
+                      label: Text(deal.isActive ? 'Pause' : 'Activate'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.forestDark,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                  if (onDelete != null)
+                    TextButton.icon(
+                      onPressed: busy ? null : onDelete,
+                      icon: const Icon(Icons.delete_outline_rounded, size: 16),
+                      label: const Text('Delete'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFF9F1D18),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -575,8 +857,10 @@ class _MiniStat extends StatelessWidget {
       children: <Widget>[
         Text(value, style: _numStyle(20, AppColors.espresso)),
         const SizedBox(height: 2),
-        Text(label,
-            style: GoogleFonts.inter(fontSize: 11.5, color: AppColors.mocha)),
+        Text(
+          label,
+          style: GoogleFonts.inter(fontSize: 11.5, color: AppColors.mocha),
+        ),
       ],
     );
   }
@@ -597,7 +881,10 @@ class _StatusDot extends StatelessWidget {
       child: Text(
         active ? 'Active' : 'Paused',
         style: GoogleFonts.inter(
-            fontSize: 11, fontWeight: FontWeight.w600, color: color),
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
       ),
     );
   }
@@ -615,17 +902,18 @@ class InsightCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.forest.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(14),
-        border: Border(
-          left: BorderSide(color: AppColors.forest, width: 3),
-        ),
+        border: Border(left: BorderSide(color: AppColors.forest, width: 3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Row(
             children: <Widget>[
-              const Icon(Icons.auto_awesome_rounded,
-                  size: 16, color: AppColors.forestDark),
+              const Icon(
+                Icons.auto_awesome_rounded,
+                size: 16,
+                color: AppColors.forestDark,
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -645,7 +933,10 @@ class InsightCard extends StatelessWidget {
               child: Text(
                 insight.body,
                 style: GoogleFonts.inter(
-                    fontSize: 13, height: 1.5, color: AppColors.mocha),
+                  fontSize: 13,
+                  height: 1.5,
+                  color: AppColors.mocha,
+                ),
               ),
             ),
         ],
@@ -665,8 +956,11 @@ class _EmptyChart extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(Icons.bar_chart_rounded,
-                size: 28, color: AppColors.mocha.withValues(alpha: 0.5)),
+            Icon(
+              Icons.bar_chart_rounded,
+              size: 28,
+              color: AppColors.mocha.withValues(alpha: 0.5),
+            ),
             const SizedBox(height: 10),
             Text(
               message,

@@ -14,7 +14,7 @@ class AnalyticsException implements Exception {
   String toString() => message;
 }
 
-/// A business owned by the signed-in user.
+/// The single business owned by the signed-in user.
 class OwnedBusiness {
   const OwnedBusiness({
     required this.id,
@@ -33,13 +33,13 @@ class OwnedBusiness {
   final String? imageUrl;
 
   factory OwnedBusiness.fromMap(Map<String, dynamic> map) => OwnedBusiness(
-        id: map['id'].toString(),
-        name: (map['name'] as String?) ?? '',
-        category: (map['category'] as String?) ?? '',
-        isActive: map['is_active'] as bool? ?? true,
-        studyLocationId: map['study_location_id'] as String?,
-        imageUrl: map['image_url'] as String?,
-      );
+    id: map['id'].toString(),
+    name: (map['name'] as String?) ?? '',
+    category: (map['category'] as String?) ?? '',
+    isActive: map['is_active'] as bool? ?? true,
+    studyLocationId: map['study_location_id'] as String?,
+    imageUrl: map['image_url'] as String?,
+  );
 }
 
 /// Date-range presets for the dashboard.
@@ -87,14 +87,14 @@ class DashboardTotals {
   double get focusHours => focusMinutes / 60.0;
 
   factory DashboardTotals.fromMap(Map<String, dynamic> map) => DashboardTotals(
-        focusMinutes: _int(map['focus_minutes']),
-        sessions: _int(map['sessions']),
-        uniqueStudents: _int(map['unique_students']),
-        averageMinutes: _double(map['average_minutes']),
-        activeNow: _int(map['active_now']),
-        returnRate: _double(map['return_rate']),
-        peakHour: _text(map['peak_hour'], fallback: 'No clear peak yet'),
-      );
+    focusMinutes: _int(map['focus_minutes']),
+    sessions: _int(map['sessions']),
+    uniqueStudents: _int(map['unique_students']),
+    averageMinutes: _double(map['average_minutes']),
+    activeNow: _int(map['active_now']),
+    returnRate: _double(map['return_rate']),
+    peakHour: _text(map['peak_hour'], fallback: 'no clear peak yet'),
+  );
 
   static const empty = DashboardTotals(
     focusMinutes: 0,
@@ -103,7 +103,7 @@ class DashboardTotals {
     averageMinutes: 0,
     activeNow: 0,
     returnRate: 0,
-    peakHour: 'No clear peak yet',
+    peakHour: 'no clear peak yet',
   );
 }
 
@@ -121,11 +121,11 @@ class TrendPoint {
   final int uniqueStudents;
 
   factory TrendPoint.fromMap(Map<String, dynamic> map) => TrendPoint(
-        date: DateTime.tryParse(_text(map['date'])) ?? DateTime.now(),
-        sessions: _int(map['sessions']),
-        focusMinutes: _int(map['focus_minutes']),
-        uniqueStudents: _int(map['unique_students']),
-      );
+    date: DateTime.tryParse(_text(map['date'])) ?? DateTime.now(),
+    sessions: _int(map['sessions']),
+    focusMinutes: _int(map['focus_minutes']),
+    uniqueStudents: _int(map['unique_students']),
+  );
 }
 
 class BreakdownItem {
@@ -140,10 +140,10 @@ class BreakdownItem {
   final double percentage; // 0..100
 
   factory BreakdownItem.fromMap(Map<String, dynamic> map) => BreakdownItem(
-        label: _text(map['label'], fallback: 'Unknown'),
-        count: _int(map['count']),
-        percentage: _double(map['percentage']),
-      );
+    label: _text(map['label'], fallback: 'Unknown'),
+    count: _int(map['count']),
+    percentage: _double(map['percentage']),
+  );
 }
 
 class HourCell {
@@ -160,15 +160,17 @@ class HourCell {
   final int focusMinutes;
 
   factory HourCell.fromMap(Map<String, dynamic> map) => HourCell(
-        weekday: _int(map['weekday']).clamp(1, 7),
-        hour: _int(map['hour']).clamp(0, 23),
-        sessions: _int(map['sessions']),
-        focusMinutes: _int(map['focus_minutes']),
-      );
+    weekday: _int(map['weekday']).clamp(1, 7),
+    hour: _int(map['hour']).clamp(0, 23),
+    sessions: _int(map['sessions']),
+    focusMinutes: _int(map['focus_minutes']),
+  );
 }
 
 class DealPerformance {
   const DealPerformance({
+    required this.id,
+    required this.businessId,
     required this.title,
     required this.description,
     required this.requiredMinutes,
@@ -179,6 +181,8 @@ class DealPerformance {
     required this.privacyLimited,
   });
 
+  final String id;
+  final String businessId;
   final String title;
   final String description;
   final int requiredMinutes;
@@ -191,15 +195,17 @@ class DealPerformance {
   double get requiredHours => requiredMinutes / 60.0;
 
   factory DealPerformance.fromMap(Map<String, dynamic> map) => DealPerformance(
-        title: _text(map['title'], fallback: 'Deal'),
-        description: _text(map['description']),
-        requiredMinutes: _int(map['required_minutes']),
-        isActive: map['is_active'] as bool? ?? true,
-        studentsStarted: _int(map['students_started']),
-        studentsUnlocked: _int(map['students_unlocked']),
-        averageProgress: _double(map['average_progress']),
-        privacyLimited: map['privacy_limited'] as bool? ?? false,
-      );
+    id: _text(map['offer_id'], fallback: _text(map['id'])),
+    businessId: _text(map['business_id']),
+    title: _text(map['title'], fallback: 'Deal'),
+    description: _text(map['description']),
+    requiredMinutes: _int(map['required_minutes']),
+    isActive: map['is_active'] as bool? ?? true,
+    studentsStarted: _int(map['students_started']),
+    studentsUnlocked: _int(map['students_unlocked']),
+    averageProgress: _ratio(map['average_progress']),
+    privacyLimited: map['privacy_limited'] as bool? ?? false,
+  );
 }
 
 class DashboardInsight {
@@ -207,7 +213,8 @@ class DashboardInsight {
   final String title;
   final String body;
 
-  factory DashboardInsight.fromMap(Map<String, dynamic> map) => DashboardInsight(
+  factory DashboardInsight.fromMap(Map<String, dynamic> map) =>
+      DashboardInsight(
         title: _text(map['title'], fallback: 'Insight'),
         body: _text(map['body']),
       );
@@ -244,25 +251,25 @@ class DashboardData {
   final List<DashboardInsight> insights;
 
   factory DashboardData.fromRpc(Map<String, dynamic> json) => DashboardData(
-        generatedAt:
-            DateTime.tryParse(_text(json['generated_at'])) ?? DateTime.now(),
-        privacyThreshold: _int(json['privacy_threshold'], fallback: 3),
-        totals: DashboardTotals.fromMap(_map(json['totals'])),
-        trend: _list(json['trend']).map(TrendPoint.fromMap).toList(),
-        gender: _list(json['gender']).map(BreakdownItem.fromMap).toList(),
-        level: _list(json['level']).map(BreakdownItem.fromMap).toList(),
-        year: _list(json['year']).map(BreakdownItem.fromMap).toList(),
-        major: _list(json['major']).map(BreakdownItem.fromMap).toList(),
-        hourly: _list(json['hourly']).map(HourCell.fromMap).toList(),
-        durationBuckets:
-            _list(json['duration_buckets']).map(BreakdownItem.fromMap).toList(),
-        deals: _list(json['deals']).map(DealPerformance.fromMap).toList(),
-        insights:
-            _list(json['insights']).map(DashboardInsight.fromMap).toList(),
-      );
+    generatedAt:
+        DateTime.tryParse(_text(json['generated_at'])) ?? DateTime.now(),
+    privacyThreshold: _int(json['privacy_threshold'], fallback: 3),
+    totals: DashboardTotals.fromMap(_map(json['totals'])),
+    trend: _list(json['trend']).map(TrendPoint.fromMap).toList(),
+    gender: _list(json['gender']).map(BreakdownItem.fromMap).toList(),
+    level: _list(json['level']).map(BreakdownItem.fromMap).toList(),
+    year: _list(json['year']).map(BreakdownItem.fromMap).toList(),
+    major: _list(json['major']).map(BreakdownItem.fromMap).toList(),
+    hourly: _list(json['hourly']).map(HourCell.fromMap).toList(),
+    durationBuckets: _list(
+      json['duration_buckets'],
+    ).map(BreakdownItem.fromMap).toList(),
+    deals: _list(json['deals']).map(DealPerformance.fromMap).toList(),
+    insights: _list(json['insights']).map(DashboardInsight.fromMap).toList(),
+  );
 }
 
-/// Current-period data plus the immediately-prior period (for ↑/↓ deltas).
+/// Current-period data plus the immediately-prior period for deltas.
 class DashboardBundle {
   const DashboardBundle({required this.current, this.previous});
   final DashboardData current;
@@ -273,20 +280,23 @@ class AnalyticsService {
   SupabaseClient get _client => Supabase.instance.client;
   String? get _uid => _client.auth.currentUser?.id;
 
-  /// Businesses owned by the signed-in user (empty if they own none).
-  Future<List<OwnedBusiness>> fetchMyBusinesses() async {
+  /// The business owned by the signed-in user.
+  ///
+  /// Cura's business model is one owned business per auth UID. Supabase should
+  /// enforce that with a unique `businesses.owner_id`.
+  Future<OwnedBusiness?> fetchMyBusiness() async {
     final uid = _uid;
-    if (uid == null) return const <OwnedBusiness>[];
+    if (uid == null) return null;
     try {
       final data = await _client
           .from('businesses')
-          .select('id,owner_id,study_location_id,name,category,image_url,is_active')
+          .select(
+            'id,owner_id,study_location_id,name,category,image_url,is_active',
+          )
           .eq('owner_id', uid)
-          .order('created_at')
-          .limit(10);
-      return data
-          .map((e) => OwnedBusiness.fromMap(Map<String, dynamic>.from(e)))
-          .toList();
+          .maybeSingle();
+      if (data == null) return null;
+      return OwnedBusiness.fromMap(Map<String, dynamic>.from(data));
     } catch (e) {
       throw AnalyticsException(_friendly(e));
     }
@@ -310,10 +320,12 @@ class AnalyticsService {
       final json = switch (response) {
         Map<String, dynamic> v => v,
         Map v => Map<String, dynamic>.from(v),
-        List v when v.isNotEmpty && v.first is Map =>
-          Map<String, dynamic>.from(v.first as Map),
+        List v when v.isNotEmpty && v.first is Map => Map<String, dynamic>.from(
+          v.first as Map,
+        ),
         _ => throw const AnalyticsException(
-            'Analytics returned an unexpected response.'),
+          'Analytics returned an unexpected response.',
+        ),
       };
       return DashboardData.fromRpc(json);
     } on AnalyticsException {
@@ -341,15 +353,94 @@ class AnalyticsService {
         end: preset.previousEnd,
       );
     } catch (_) {
-      previous = null; // deltas are a nice-to-have; never block the page on them
+      previous =
+          null; // deltas are a nice-to-have; never block the page on them
     }
     return DashboardBundle(current: current, previous: previous);
   }
 
-  String _dateOnly(DateTime value) =>
-      DateTime(value.year, value.month, value.day)
-          .toIso8601String()
-          .substring(0, 10);
+  Future<void> saveOffer({
+    String? id,
+    required String businessId,
+    required String title,
+    required String description,
+    required int requiredMinutes,
+    required bool isActive,
+  }) async {
+    if (_uid == null) {
+      throw const AnalyticsException('Please sign in again to manage rewards.');
+    }
+
+    final values = <String, dynamic>{
+      'business_id': businessId,
+      'title': _cleanText(title, field: 'Offer title', max: 120),
+      'description': _cleanText(
+        description,
+        field: 'Offer description',
+        max: 500,
+        required: false,
+      ),
+      'required_minutes': _requiredMinutes(requiredMinutes),
+      'is_active': isActive,
+    };
+
+    try {
+      if (id == null) {
+        await _client.from('offers').insert(values);
+      } else {
+        await _client
+            .from('offers')
+            .update(values)
+            .eq('id', id)
+            .eq('business_id', businessId);
+      }
+    } catch (e) {
+      throw AnalyticsException(_friendly(e));
+    }
+  }
+
+  Future<void> deleteOffer({
+    required String id,
+    required String businessId,
+  }) async {
+    if (_uid == null) {
+      throw const AnalyticsException('Please sign in again to manage rewards.');
+    }
+    try {
+      await _client
+          .from('offers')
+          .delete()
+          .eq('id', id)
+          .eq('business_id', businessId);
+    } catch (e) {
+      throw AnalyticsException(_friendly(e));
+    }
+  }
+
+  Future<void> setOfferActive({
+    required String id,
+    required String businessId,
+    required bool isActive,
+  }) async {
+    if (_uid == null) {
+      throw const AnalyticsException('Please sign in again to manage rewards.');
+    }
+    try {
+      await _client
+          .from('offers')
+          .update(<String, dynamic>{'is_active': isActive})
+          .eq('id', id)
+          .eq('business_id', businessId);
+    } catch (e) {
+      throw AnalyticsException(_friendly(e));
+    }
+  }
+
+  String _dateOnly(DateTime value) => DateTime(
+    value.year,
+    value.month,
+    value.day,
+  ).toIso8601String().substring(0, 10);
 
   String _friendly(Object error) {
     final text = error.toString().toLowerCase();
@@ -359,12 +450,57 @@ class AnalyticsService {
     if (text.contains('row-level security') ||
         text.contains('policy') ||
         text.contains('not allowed')) {
-      return 'Not allowed — make sure you own this business.';
+      return 'Not allowed. Make sure you own this business.';
+    }
+    if (text.contains('multiple') || text.contains('singular')) {
+      return 'This account is linked to more than one business. Supabase should allow only one business per owner.';
+    }
+    if (text.contains('offers') &&
+        (text.contains('does not exist') ||
+            text.contains('could not find') ||
+            text.contains('not found'))) {
+      return 'Offer management is not available yet. Apply the Supabase offer policies, then try again.';
     }
     if (text.contains('does not exist') || text.contains('could not find')) {
       return 'Analytics are not available yet for this account.';
     }
-    return 'Something went wrong loading analytics. Please try again.';
+    if (text.contains('violates check constraint') ||
+        text.contains('offers_title_check')) {
+      return 'Check the offer title, description, and required hours.';
+    }
+    if (text.contains('permission denied') ||
+        text.contains('offers') && text.contains('not found')) {
+      return 'Offer management is not available yet. Apply the Supabase offer policies, then try again.';
+    }
+    return 'Something went wrong. Please try again.';
+  }
+
+  String _cleanText(
+    String value, {
+    required String field,
+    required int max,
+    bool required = true,
+  }) {
+    final normalized = value.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (required && normalized.isEmpty) {
+      throw AnalyticsException('$field is required.');
+    }
+    if (normalized.length > max) {
+      throw AnalyticsException('$field must be $max characters or fewer.');
+    }
+    return normalized;
+  }
+
+  int _requiredMinutes(int value) {
+    if (value < 1) {
+      throw const AnalyticsException(
+        'Required study time must be at least 1 minute.',
+      );
+    }
+    if (value > 100000) {
+      throw const AnalyticsException('Required study time is too high.');
+    }
+    return value;
   }
 }
 
@@ -399,4 +535,10 @@ double _double(dynamic value, {double fallback = 0}) {
   if (value is double) return value;
   if (value is num) return value.toDouble();
   return double.tryParse(value?.toString() ?? '') ?? fallback;
+}
+
+double _ratio(dynamic value, {double fallback = 0}) {
+  final raw = _double(value, fallback: fallback);
+  if (raw > 1) return (raw / 100).clamp(0.0, 1.0);
+  return raw.clamp(0.0, 1.0);
 }

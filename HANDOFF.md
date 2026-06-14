@@ -1,6 +1,6 @@
 # Cura-Web — Engineering Handoff
 
-_Last updated: 2026-06-12_
+_Last updated: 2026-06-14_
 
 This document describes the **Cura-Web** project end to end: what it is, how it's
 built, where it lives, how it deploys, how it connects to the backend and the
@@ -15,15 +15,45 @@ Cura-Web is the **marketing website + business portal** for **Cura**, a study-fo
 iOS app. It is a single **Flutter Web** app with two halves:
 
 - **Landing page** — a marketing page with a scroll-scrubbed hero video, an
-  intro animation, fade-in quotes, and "Sign in" / "Download on the App Store" CTAs.
+  intro animation, fade-in quotes, a student/business audience switch, a student
+  App Store CTA, and a business contact CTA.
 - **Business dashboard** — an analytics portal where **partner businesses** (e.g.
-  cafés/libraries that host Cura study sessions) see how students use their location.
+  cafés/libraries that host Cura study sessions) see how students use their
+  location and manage their active offers.
 
 **Web is business-only by design.** The student/customer experience stays in the
 mobile app; the web app exists for marketing + the business analytics portal.
 
 It is a **separate codebase** from the Cura mobile app but talks to the **same
 Supabase backend**.
+
+### Recent work summary (2026-06-14)
+
+- Rebranded the old BREW prototype to Cura across the app shell, metadata,
+  landing copy, README, and browser-facing site details.
+- Simplified the landing nav: the student view is the default, `For Businesses`
+  switches the same page into business-focused copy, business mode shows
+  `For Students` plus `Dashboard`, and `Contact Us` opens
+  `mailto:info@cura.coffee`.
+- Kept the student landing page visually consistent while adding business copy
+  about student reach, simple offers, privacy-safe visit trends, and dashboard
+  value.
+- Smoothed the intro/startup experience and kept a reduced-motion fallback for
+  users who disable animations.
+- Restored and cleaned the business dashboard after layout regressions: the
+  dashboard snapshot now reads as a sentence, the updated badge is gone, card
+  overflow issues were fixed, filters refresh the UI correctly, and no business
+  switcher is shown because one owner UID maps to one business.
+- Added owner-side offer management in the dashboard: create, edit, pause,
+  resume, and delete offers from the same area as reward performance.
+- Expanded the analytics/service layer for the dashboard, including offer CRUD,
+  better empty/error states, normalized reward progress, and cache invalidation
+  after owner mutations.
+- Added Supabase alignment SQL for the dashboard and offer-management model.
+  These files are checked in, but live database application still needs to be
+  done separately in Supabase.
+- Verified locally with `flutter analyze`, `flutter test`, and
+  `flutter build web --release --base-href "/"`.
 
 ---
 
@@ -71,7 +101,7 @@ Supabase backend**.
 
 - **Repo:** https://github.com/matyasbeyene/Cura-Web (**public** — safe, see §9)
 - **Branch:** `main` (deploys from here)
-- **Local path:** `C:\Users\matik\Downloads\coffee_landing`
+- **Local path:** `C:\Users\nanda\Documents\Cura-Web`
 - **Related repo (mobile app, separate):** `github.com/nandanpraveen/curamvpcode`
   (local `C:\Users\matik\Downloads\curamvpcode`). Its `HANDOFF.md` is the
   authoritative product/backend brief.
@@ -86,10 +116,12 @@ Key files (the map — see the files themselves for detail):
 | `lib/pages/sign_in_page.dart` | Email/password + Google sign-in |
 | `lib/pages/dashboard_page.dart` | Business dashboard (data load, states, layout) |
 | `lib/services/analytics_service.dart` | Data layer — models + the dashboard RPC call |
-| `lib/widgets/top_nav.dart` | Top nav, sign-in button, App Store badge, logo |
+| `lib/widgets/top_nav.dart` | Top nav, Cura wordmark, audience switch, dashboard button, App Store badge, contact CTA |
 | `lib/widgets/dashboard_widgets.dart` | KPI cards, charts, heatmap, breakdowns |
 | `lib/scroll_video/scroll_video_scrubber.dart` | Scroll-driven DOM `<video>` hero |
 | `lib/theme/app_theme.dart` | Brand colors + fonts |
+| `supabase/business_dashboard_alignment.sql` | DB alignment: one business per owner + dashboard RPC assertion |
+| `supabase/business_offer_management.sql` | DB alignment for owner-managed offers |
 | `web/index.html` | Page shell; body background = the video's border |
 | `web/media/scene.mp4` · `poster.jpg` · `scene.json` | Hero video, poster, runtime config |
 | `tool/serve.py` | Local static server (SPA fallback, no-cache) |
@@ -181,6 +213,8 @@ Key files (the map — see the files themselves for detail):
 `businesses`, `offers`.
 
 - A **business** = a `businesses` row whose `owner_id` is its login user.
+- Cura Web assumes **one business per owner UID**. Enforce that in Supabase with
+  the partial unique index in `supabase/business_dashboard_alignment.sql`.
 - It links to a `study_locations` row via `study_location_id`.
 - Its **visits** = `focus_sessions` where `location_id` = that `study_location_id`.
 
@@ -207,14 +241,16 @@ business_dashboard_summary(p_business_id uuid, p_start_date date, p_end_date dat
   `http://localhost:8000` for local dev). The web sign-in redirects back to the page
   origin.
 - **Dashboard access gating:** `/dashboard` requires (a) a signed-in user and
-  (b) that the user owns a `businesses` row. Otherwise it shows a "sign in" or
-  "partner businesses only" state.
+  (b) that the user owns exactly one `businesses` row. Otherwise it shows a
+  "sign in", "partner businesses only", or DB-alignment error state.
+- **Dashboard sign-in redirect:** `/dashboard` sends signed-out users to
+  `/sign-in?redirect=/dashboard`; successful sign-in returns to the dashboard.
 
 ---
 
 ## 8. Local development
 
-From `C:\Users\matik\Downloads\coffee_landing`:
+From `C:\Users\nanda\Documents\Cura-Web`:
 
 ```powershell
 flutter pub get
@@ -255,11 +291,8 @@ The clip is `web/media/scene.mp4` with runtime config in `web/media/scene.json`
 
 ## 10. Known gaps / TODO
 
-- **Bear logo image:** `top_nav` loads `web/media/logo.png` with a "Cura" text
-  fallback, and that PNG isn't in the repo yet — so the wordmark currently renders as
-  text. Drop the cropped bear PNG at `web/media/logo.png` to show the logo.
-- **Post-login redirect:** signing in doesn't yet bounce a business owner straight to
-  `/dashboard`; they sign in, then navigate to Dashboard. Nice-to-have.
+- **App Store URL:** the App Store badge is in place, but the repo does not yet
+  include a production App Store link for the Cura iOS app.
 - **Supabase prod redirect URL:** confirm `https://cura.coffee` is added to
   Authentication → Redirect URLs so Google sign-in works in production.
 - **Enforce HTTPS:** flip the toggle in Settings → Pages once the cert is issued.
@@ -274,7 +307,7 @@ The clip is `web/media/scene.mp4` with runtime config in `web/media/scene.json`
 |------|------|
 | Live URL | https://cura.coffee |
 | Repo | https://github.com/matyasbeyene/Cura-Web (public, branch `main`) |
-| Local | `C:\Users\matik\Downloads\coffee_landing` |
+| Local | `C:\Users\nanda\Documents\Cura-Web` |
 | Host | GitHub Pages (static + CDN + auto HTTPS) |
 | Deploy | `git push origin main` → Actions builds + deploys (needs push approval) |
 | DNS | GoDaddy → apex A-records to `185.199.108–111.153`; `www` CNAME → `matyasbeyene.github.io` |

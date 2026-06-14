@@ -6,11 +6,11 @@ import '../theme/app_theme.dart';
 /// EDIT THESE: the words revealed one-by-one on first load.
 /// Keep it short (≈3–6 words) so it reads in a few seconds.
 const List<String> kIntroWords = <String>[
-  'Every',
-  'morning',
-  'deserves',
-  'a',
-  'ritual.',
+  'Find',
+  'your',
+  'focus',
+  'with',
+  'Cura.',
 ];
 
 /// A first-load intro: each word fades + rises in sequence ("Apple style"),
@@ -28,26 +28,47 @@ class IntroOverlay extends StatefulWidget {
 class _IntroOverlayState extends State<IntroOverlay>
     with SingleTickerProviderStateMixin {
   // Timing knobs (seconds).
-  static const double _perWord = 0.42; // gap between each word starting
-  static const double _wordFade = 0.6; // how long each word takes to arrive
-  static const double _hold = 0.9; // pause after the last word
-  static const double _outFade = 0.6; // overlay fade-out
+  static const double _perWord = 0.34; // gap between each word starting
+  static const double _wordIn = 0.82; // how long each word takes to arrive
+  static const double _hold = 0.72; // pause after the last word
+  static const double _outFade = 0.72; // overlay fade-out
 
   late final AnimationController _c;
   late final double _total;
+  late final Animation<double> _overlayOpacity;
+  late final Animation<double> _phraseScale;
+  late final TextStyle _wordStyle;
 
   @override
   void initState() {
     super.initState();
     final int n = kIntroWords.isEmpty ? 1 : kIntroWords.length;
-    _total = (n - 1) * _perWord + _wordFade + _hold + _outFade;
-    _c = AnimationController(
-      vsync: this,
-      duration: Duration(milliseconds: (_total * 1000).round()),
-    )..addStatusListener((AnimationStatus s) {
-        if (s == AnimationStatus.completed) widget.onComplete();
-      });
-    _c.forward();
+    _total = (n - 1) * _perWord + _wordIn + _hold + _outFade;
+    _c =
+        AnimationController(
+          vsync: this,
+          duration: Duration(milliseconds: (_total * 1000).round()),
+        )..addStatusListener((AnimationStatus s) {
+          if (s == AnimationStatus.completed) widget.onComplete();
+        });
+    _overlayOpacity = Tween<double>(begin: 1, end: 0).animate(
+      CurvedAnimation(
+        parent: _c,
+        curve: Interval(_outStartNorm, 1, curve: Curves.easeInOutCubic),
+      ),
+    );
+    _phraseScale = Tween<double>(begin: 0.985, end: 1).animate(
+      CurvedAnimation(
+        parent: _c,
+        curve: Interval(0, _outStartNorm, curve: Curves.easeOutCubic),
+      ),
+    );
+    _wordStyle = GoogleFonts.fraunces(
+      fontWeight: FontWeight.w600,
+      letterSpacing: 0,
+      color: AppColors.warmBlack,
+    );
+    _warmFontsAndStart();
   }
 
   @override
@@ -58,63 +79,102 @@ class _IntroOverlayState extends State<IntroOverlay>
 
   double get _outStartNorm => (_total - _outFade) / _total;
 
+  Future<void> _warmFontsAndStart() async {
+    // Calling the style above queues the font load. Waiting briefly prevents
+    // the first intro frames from being spent fetching/swapping the display
+    // font, which is especially visible during hot restart on web.
+    try {
+      await GoogleFonts.pendingFonts().timeout(
+        const Duration(milliseconds: 700),
+      );
+    } catch (_) {
+      // Start anyway if the font is slow or unavailable; the app should not
+      // block on a network font.
+    }
+    if (!mounted) return;
+    _c.forward();
+  }
+
   @override
   Widget build(BuildContext context) {
     final double w = MediaQuery.of(context).size.width;
     final double fontSize = w < 600 ? 32 : 60;
 
-    return AnimatedBuilder(
-      animation: _c,
-      builder: (BuildContext context, _) {
-        final double tNorm = _c.value;
-        double overlayOpacity = 1.0;
-        if (tNorm > _outStartNorm) {
-          overlayOpacity =
-              (1.0 - (tNorm - _outStartNorm) / (1.0 - _outStartNorm))
-                  .clamp(0.0, 1.0);
-        }
-        final double elapsed = tNorm * _total;
-        return Opacity(
-          opacity: overlayOpacity,
-          // Material (not ColoredBox) so the intro text has a DefaultTextStyle
-          // ancestor — otherwise Flutter paints the debug yellow underline.
-          child: Material(
-            color: AppColors.border,
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
+    return FadeTransition(
+      opacity: _overlayOpacity,
+      child: RepaintBoundary(
+        // Material (not ColoredBox) so the intro text has a DefaultTextStyle
+        // ancestor; otherwise Flutter paints the debug yellow underline.
+        child: Material(
+          color: AppColors.border,
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: ScaleTransition(
+                scale: _phraseScale,
                 child: Wrap(
                   alignment: WrapAlignment.center,
-                  spacing: fontSize * 0.28,
+                  spacing: fontSize * 0.24,
                   runSpacing: 8,
                   children: <Widget>[
                     for (int i = 0; i < kIntroWords.length; i++)
-                      _word(kIntroWords[i], i, fontSize, elapsed),
+                      _IntroWord(
+                        controller: _c,
+                        total: _total,
+                        start: i * _perWord,
+                        duration: _wordIn,
+                        word: kIntroWords[i],
+                        style: _wordStyle.copyWith(fontSize: fontSize),
+                      ),
                   ],
                 ),
               ),
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
+}
 
-  Widget _word(String word, int i, double fontSize, double elapsed) {
-    final double start = i * _perWord;
-    final double raw = ((elapsed - start) / _wordFade).clamp(0.0, 1.0);
-    final double eased = Curves.easeOut.transform(raw);
-    return Opacity(
-      opacity: eased,
-      child: Transform.translate(
-        offset: Offset(0, (1 - eased) * 18),
+class _IntroWord extends StatelessWidget {
+  const _IntroWord({
+    required this.controller,
+    required this.total,
+    required this.start,
+    required this.duration,
+    required this.word,
+    required this.style,
+  });
+
+  final AnimationController controller;
+  final double total;
+  final double start;
+  final double duration;
+  final String word;
+  final TextStyle style;
+
+  @override
+  Widget build(BuildContext context) {
+    final double begin = (start / total).clamp(0.0, 1.0);
+    final double end = ((start + duration) / total).clamp(begin, 1.0);
+    final Animation<double> arrival = CurvedAnimation(
+      parent: controller,
+      curve: Interval(begin, end, curve: Curves.easeOutCubic),
+    );
+    return FadeTransition(
+      opacity: arrival,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, 0.34),
+          end: Offset.zero,
+        ).animate(arrival),
         child: Text(
           word,
-          style: GoogleFonts.fraunces(
-            fontSize: fontSize,
-            fontWeight: FontWeight.w600,
-            letterSpacing: -0.5,
-            color: AppColors.warmBlack,
+          style: style,
+          textHeightBehavior: const TextHeightBehavior(
+            applyHeightToFirstAscent: false,
+            applyHeightToLastDescent: false,
           ),
         ),
       ),
