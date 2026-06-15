@@ -28,10 +28,10 @@ class IntroOverlay extends StatefulWidget {
 class _IntroOverlayState extends State<IntroOverlay>
     with SingleTickerProviderStateMixin {
   // Timing knobs (seconds).
-  static const double _perWord = 0.34; // gap between each word starting
-  static const double _wordIn = 0.82; // how long each word takes to arrive
-  static const double _hold = 0.72; // pause after the last word
-  static const double _outFade = 0.72; // overlay fade-out
+  static const double _perWord = 0.17; // gap between each word starting
+  static const double _wordIn = 0.41; // how long each word takes to arrive
+  static const double _hold = 0.36; // pause after the last word
+  static const double _outFade = 0.36; // overlay fade-out
 
   late final AnimationController _c;
   late final double _total;
@@ -85,7 +85,7 @@ class _IntroOverlayState extends State<IntroOverlay>
     // font, which is especially visible during hot restart on web.
     try {
       await GoogleFonts.pendingFonts().timeout(
-        const Duration(milliseconds: 700),
+        const Duration(milliseconds: 350),
       );
     } catch (_) {
       // Start anyway if the font is slow or unavailable; the app should not

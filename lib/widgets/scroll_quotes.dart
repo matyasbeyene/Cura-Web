@@ -95,6 +95,16 @@ class ScrollQuotes extends StatelessWidget {
       dx = 0.0;
     }
 
+    final TextAlign align = q.side == QuoteSide.left
+        ? TextAlign.left
+        : TextAlign.right;
+    final TextStyle quoteStyle = GoogleFonts.fraunces(
+      fontSize: narrow ? 24 : 38,
+      height: 1.25,
+      fontStyle: FontStyle.italic,
+      fontWeight: FontWeight.w500,
+      color: AppColors.warmBlack,
+    );
     final double maxW = narrow ? w * 0.84 : w * 0.34;
     final Widget block = Opacity(
       opacity: opacity,
@@ -102,18 +112,11 @@ class ScrollQuotes extends StatelessWidget {
         offset: Offset(dx, 0),
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: maxW),
-          child: Text(
-            q.text,
-            textAlign: q.side == QuoteSide.left
-                ? TextAlign.left
-                : TextAlign.right,
-            style: GoogleFonts.fraunces(
-              fontSize: narrow ? 24 : 38,
-              height: 1.25,
-              fontStyle: FontStyle.italic,
-              fontWeight: FontWeight.w500,
-              color: AppColors.warmBlack,
-            ),
+          child: _OutlinedQuoteText(
+            text: q.text,
+            align: align,
+            style: quoteStyle,
+            strokeWidth: narrow ? 3.0 : 4.0,
           ),
         ),
       ),
@@ -133,6 +136,40 @@ class ScrollQuotes extends StatelessWidget {
           ? const Alignment(-0.9, 0)
           : const Alignment(0.9, 0),
       child: block,
+    );
+  }
+}
+
+class _OutlinedQuoteText extends StatelessWidget {
+  const _OutlinedQuoteText({
+    required this.text,
+    required this.align,
+    required this.style,
+    required this.strokeWidth,
+  });
+
+  final String text;
+  final TextAlign align;
+  final TextStyle style;
+  final double strokeWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: <Widget>[
+        Text(
+          text,
+          textAlign: align,
+          style: style.copyWith(
+            foreground: Paint()
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = strokeWidth
+              ..strokeJoin = StrokeJoin.round
+              ..color = AppColors.cream.withValues(alpha: 0.88),
+          ),
+        ),
+        Text(text, textAlign: align, style: style),
+      ],
     );
   }
 }

@@ -1,6 +1,6 @@
 # Cura-Web — Engineering Handoff
 
-_Last updated: 2026-06-14_
+_Last updated: 2026-06-15_
 
 This document describes the **Cura-Web** project end to end: what it is, how it's
 built, where it lives, how it deploys, how it connects to the backend and the
@@ -27,7 +27,19 @@ mobile app; the web app exists for marketing + the business analytics portal.
 It is a **separate codebase** from the Cura mobile app but talks to the **same
 Supabase backend**.
 
-### Recent work summary (2026-06-14)
+### Recent work summary (2026-06-15)
+
+- GitHub Pages HTTPS is now enforced for `https://cura.coffee`.
+- Changed the sign-in flow so successful sign-in defaults directly to the
+  business dashboard instead of stopping on the "You're signed in" confirmation
+  page. Explicit safe redirect paths still work.
+- Added a light cream outline behind the scroll-quote text while preserving the
+  existing dark fill color, improving readability on bright iOS video frames.
+- Made the first-load "Find your focus with Cura." intro roughly 2x faster.
+- Verified locally with `flutter analyze`, `flutter test`, and
+  `flutter build web --release --base-href "/"`.
+
+### Previous work summary (2026-06-14)
 
 - Rebranded the old BREW prototype to Cura across the app shell, metadata,
   landing copy, README, and browser-facing site details.
@@ -164,8 +176,8 @@ Key files (the map — see the files themselves for detail):
 - **Custom domain** is set in GitHub repo **Settings → Pages → Custom domain =
   `cura.coffee`**, and the CI also writes a `CNAME` file into the build so it sticks
   across deploys.
-- **HTTPS** is auto-issued by GitHub (Let's Encrypt) once DNS resolves. Turn on
-  **Settings → Pages → Enforce HTTPS** after the cert is provisioned.
+- **HTTPS** is auto-issued by GitHub (Let's Encrypt) and is currently enforced
+  in GitHub Pages settings.
 
 > Note: the `matyasbeyene.github.io/Cura-Web/` URL will look broken (assets 404)
 > because the build is rooted (`--base-href "/"`) for the apex domain. Judge the site
@@ -295,7 +307,6 @@ The clip is `web/media/scene.mp4` with runtime config in `web/media/scene.json`
   include a production App Store link for the Cura iOS app.
 - **Supabase prod redirect URL:** confirm `https://cura.coffee` is added to
   Authentication → Redirect URLs so Google sign-in works in production.
-- **Enforce HTTPS:** flip the toggle in Settings → Pages once the cert is issued.
 - **More pages:** the original plan mentioned ~4 pages; only landing + sign-in +
   dashboard exist. Customer/student web is intentionally out of scope.
 

@@ -10,8 +10,7 @@ import '../theme/app_theme.dart';
 /// Sign-in page wired to the Cura Supabase backend.
 ///
 /// Supports email/password (the same credentials as the iOS app) and Google
-/// OAuth. Reflects auth state: once signed in it shows a confirmation instead
-/// of the form.
+/// OAuth. By default, a successful sign-in opens the business dashboard.
 class SignInPage extends StatefulWidget {
   const SignInPage({super.key, this.redirectPath});
 
@@ -33,11 +32,11 @@ class _SignInPageState extends State<SignInPage> {
 
   SupabaseClient get _supabase => Supabase.instance.client;
   String get _returnPath {
-    final value = widget.redirectPath?.trim() ?? '/';
+    final value = widget.redirectPath?.trim() ?? '/dashboard';
     if (value.isEmpty || !value.startsWith('/') || value.startsWith('//')) {
-      return '/';
+      return '/dashboard';
     }
-    if (value.startsWith('/sign-in')) return '/';
+    if (value.startsWith('/sign-in')) return '/dashboard';
     return value;
   }
 
