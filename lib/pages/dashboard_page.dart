@@ -990,7 +990,7 @@ class _OfferEditorDialogState extends State<_OfferEditorDialog> {
         description: _description.text.trim(),
         offerType: _offerType,
         requiredMinutes: _offerType.isStudy
-            ? (hours * 60).round().clamp(1, 100000).toInt()
+            ? (hours * 60).ceil().clamp(1, 100000).toInt()
             : 0,
         redemptionCode: _redemptionCode.text.trim(),
         startsAt: startsAt,

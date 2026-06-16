@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Business analytics for Cura partner businesses.
@@ -221,23 +223,31 @@ class DealPerformance {
   double get requiredHours => requiredMinutes / 60.0;
   bool get isPromotion => offerType.isPromotion;
 
-  factory DealPerformance.fromMap(Map<String, dynamic> map) => DealPerformance(
-    id: _text(map['offer_id'], fallback: _text(map['id'])),
-    businessId: _text(map['business_id']),
-    title: _text(map['title'], fallback: 'Deal'),
-    description: _text(map['description']),
-    offerType: OfferType.fromValue(map['offer_type']),
-    requiredMinutes: _int(map['required_minutes']),
-    redemptionCode: _text(map['redemption_code']),
-    isActive: map['is_active'] as bool? ?? true,
-    startsAt: DateTime.tryParse(_text(map['starts_at'])),
-    endsAt: DateTime.tryParse(_text(map['ends_at'])),
-    redemptions: _int(map['redemptions']),
-    studentsStarted: _int(map['students_started']),
-    studentsUnlocked: _int(map['students_unlocked']),
-    averageProgress: _ratio(map['average_progress']),
-    privacyLimited: map['privacy_limited'] as bool? ?? false,
-  );
+  factory DealPerformance.fromMap(Map<String, dynamic> map) {
+    final legacyMetadata = _parseLegacyOfferMetadata(_text(map['description']));
+    final type =
+        legacyMetadata.offerType ?? OfferType.fromValue(map['offer_type']);
+    return DealPerformance(
+      id: _text(map['offer_id'], fallback: _text(map['id'])),
+      businessId: _text(map['business_id']),
+      title: _text(map['title'], fallback: 'Deal'),
+      description: legacyMetadata.description,
+      offerType: type,
+      requiredMinutes: type.isPromotion ? 0 : _int(map['required_minutes']),
+      redemptionCode: _text(
+        map['redemption_code'],
+        fallback: legacyMetadata.redemptionCode,
+      ),
+      isActive: map['is_active'] as bool? ?? true,
+      startsAt: DateTime.tryParse(_text(map['starts_at'])),
+      endsAt: DateTime.tryParse(_text(map['ends_at'])),
+      redemptions: _int(map['redemptions']),
+      studentsStarted: _int(map['students_started']),
+      studentsUnlocked: _int(map['students_unlocked']),
+      averageProgress: _ratio(map['average_progress']),
+      privacyLimited: map['privacy_limited'] as bool? ?? false,
+    );
+  }
 }
 
 class DashboardInsight {
@@ -299,6 +309,21 @@ class DashboardData {
     deals: _list(json['deals']).map(DealPerformance.fromMap).toList(),
     insights: _list(json['insights']).map(DashboardInsight.fromMap).toList(),
   );
+
+  DashboardData copyWith({List<DealPerformance>? deals}) => DashboardData(
+    generatedAt: generatedAt,
+    privacyThreshold: privacyThreshold,
+    totals: totals,
+    trend: trend,
+    gender: gender,
+    level: level,
+    year: year,
+    major: major,
+    hourly: hourly,
+    durationBuckets: durationBuckets,
+    deals: deals ?? this.deals,
+    insights: insights,
+  );
 }
 
 /// Current-period data plus the immediately-prior period for deltas.
@@ -359,7 +384,10 @@ class AnalyticsService {
           'Analytics returned an unexpected response.',
         ),
       };
-      return DashboardData.fromRpc(json);
+      return await _withDirectDealsIfNeeded(
+        DashboardData.fromRpc(json),
+        businessId: businessId,
+      );
     } on AnalyticsException {
       rethrow;
     } catch (e) {
@@ -412,39 +440,93 @@ class AnalyticsService {
       );
     }
 
+    final normalizedTitle = _cleanText(title, field: 'Offer title', max: 120);
+    final normalizedDescription = _cleanText(
+      description,
+      field: 'Offer description',
+      max: 500,
+      required: false,
+    );
+    final normalizedRequiredMinutes = _requiredMinutes(
+      requiredMinutes,
+      offerType,
+    );
+    final normalizedRedemptionCode = _cleanText(
+      redemptionCode,
+      field: 'POS coupon code',
+      max: 80,
+    );
     final values = <String, dynamic>{
       'business_id': businessId,
-      'title': _cleanText(title, field: 'Offer title', max: 120),
-      'description': _cleanText(
-        description,
-        field: 'Offer description',
-        max: 500,
-        required: false,
-      ),
+      'title': normalizedTitle,
+      'description': normalizedDescription,
       'offer_type': offerType.value,
-      'required_minutes': _requiredMinutes(requiredMinutes, offerType),
-      'redemption_code': _cleanText(
-        redemptionCode,
-        field: 'POS coupon code',
-        max: 80,
-      ),
+      'required_minutes': normalizedRequiredMinutes,
+      'redemption_code': normalizedRedemptionCode,
       'starts_at': startsAt.toUtc().toIso8601String(),
       'ends_at': endsAt.toUtc().toIso8601String(),
       'is_active': isActive,
     };
 
     try {
-      if (id == null) {
-        await _client.from('offers').insert(values);
-      } else {
-        await _client
-            .from('offers')
-            .update(values)
-            .eq('id', id)
-            .eq('business_id', businessId);
-      }
+      await _writeOffer(id: id, businessId: businessId, values: values);
     } catch (e) {
-      throw AnalyticsException(_friendly(e));
+      if (!_isSchemaMismatch(e)) throw AnalyticsException(_friendly(e));
+      if (offerType.isPromotion) {
+        final legacyValues = <String, dynamic>{
+          'business_id': businessId,
+          'title': normalizedTitle,
+          'description': _encodeLegacyOfferMetadata(
+            description: normalizedDescription,
+            offerType: offerType,
+            redemptionCode: normalizedRedemptionCode,
+          ),
+          'required_minutes': 1,
+          'is_active': isActive,
+        };
+        try {
+          await _writeOffer(
+            id: id,
+            businessId: businessId,
+            values: legacyValues,
+          );
+          return;
+        } catch (legacyError) {
+          throw AnalyticsException(_friendly(legacyError));
+        }
+      }
+      final legacyValues = <String, dynamic>{
+        'business_id': businessId,
+        'title': normalizedTitle,
+        'description': _encodeLegacyOfferMetadata(
+          description: normalizedDescription,
+          offerType: offerType,
+          redemptionCode: normalizedRedemptionCode,
+        ),
+        'required_minutes': normalizedRequiredMinutes,
+        'is_active': isActive,
+      };
+      try {
+        await _writeOffer(id: id, businessId: businessId, values: legacyValues);
+      } catch (legacyError) {
+        throw AnalyticsException(_friendly(legacyError));
+      }
+    }
+  }
+
+  Future<void> _writeOffer({
+    required String? id,
+    required String businessId,
+    required Map<String, dynamic> values,
+  }) async {
+    if (id == null) {
+      await _client.from('offers').insert(values);
+    } else {
+      await _client
+          .from('offers')
+          .update(values)
+          .eq('id', id)
+          .eq('business_id', businessId);
     }
   }
 
@@ -485,6 +567,48 @@ class AnalyticsService {
     }
   }
 
+  Future<DashboardData> _withDirectDealsIfNeeded(
+    DashboardData dashboard, {
+    required String businessId,
+  }) async {
+    if (dashboard.deals.isNotEmpty) return dashboard;
+    final deals = await _fetchDirectDeals(businessId);
+    if (deals.isEmpty) return dashboard;
+    return dashboard.copyWith(deals: deals);
+  }
+
+  Future<List<DealPerformance>> _fetchDirectDeals(String businessId) async {
+    try {
+      final response = await _client.rpc(
+        'business_offer_admin_rows',
+        params: <String, dynamic>{'p_business_id': businessId},
+      );
+      return _parseDeals(response);
+    } catch (e) {
+      if (!_isSchemaMismatch(e)) return const <DealPerformance>[];
+    }
+
+    try {
+      final data = await _client
+          .from('offers')
+          .select(_directOfferColumns)
+          .eq('business_id', businessId)
+          .limit(100);
+      return _parseDeals(data);
+    } catch (_) {
+      try {
+        final data = await _client
+            .from('offers')
+            .select(_legacyDirectOfferColumns)
+            .eq('business_id', businessId)
+            .limit(100);
+        return _parseDeals(data);
+      } catch (_) {
+        return const <DealPerformance>[];
+      }
+    }
+  }
+
   String _dateOnly(DateTime value) => DateTime(
     value.year,
     value.month,
@@ -522,6 +646,17 @@ class AnalyticsService {
       return 'Offer management is not available yet. Apply the Supabase offer policies, then try again.';
     }
     return 'Something went wrong. Please try again.';
+  }
+
+  bool _isSchemaMismatch(Object error) {
+    final text = error.toString().toLowerCase();
+    return text.contains('offer_type') ||
+        text.contains('redemption_code') ||
+        text.contains('starts_at') ||
+        text.contains('schema cache') ||
+        text.contains('could not find') ||
+        text.contains('does not exist') ||
+        text.contains('pgrst204');
   }
 
   String _cleanText(
@@ -591,4 +726,78 @@ double _ratio(dynamic value, {double fallback = 0}) {
   final raw = _double(value, fallback: fallback);
   if (raw > 1) return (raw / 100).clamp(0.0, 1.0);
   return raw.clamp(0.0, 1.0);
+}
+
+const _legacyMarkerPrefix = '[CURA_OFFER_META:';
+const _legacyMarkerSuffix = ']';
+const _directOfferColumns =
+    'id,business_id,title,description,offer_type,required_minutes,'
+    'redemption_code,starts_at,ends_at,is_active';
+const _legacyDirectOfferColumns =
+    'id,business_id,title,description,required_minutes,is_active';
+
+List<DealPerformance> _parseDeals(Object? data) {
+  final rows = data is List ? data : const <Object?>[];
+  return <DealPerformance>[
+    for (final row in rows)
+      if (row is Map) DealPerformance.fromMap(Map<String, dynamic>.from(row)),
+  ];
+}
+
+class _LegacyOfferMetadata {
+  const _LegacyOfferMetadata({
+    required this.description,
+    this.offerType,
+    this.redemptionCode = '',
+  });
+
+  final String description;
+  final OfferType? offerType;
+  final String redemptionCode;
+}
+
+String _encodeLegacyOfferMetadata({
+  required String description,
+  required OfferType offerType,
+  required String redemptionCode,
+}) {
+  final metadata = jsonEncode({
+    'offer_type': offerType.value,
+    'redemption_code': redemptionCode,
+  });
+  final encoded = base64Url.encode(utf8.encode(metadata));
+  final cleanDescription = _parseLegacyOfferMetadata(description).description;
+  return [
+    if (cleanDescription.trim().isNotEmpty) cleanDescription.trim(),
+    '$_legacyMarkerPrefix$encoded$_legacyMarkerSuffix',
+  ].join('\n\n');
+}
+
+_LegacyOfferMetadata _parseLegacyOfferMetadata(String value) {
+  final trimmed = value.trimRight();
+  final start = trimmed.lastIndexOf(_legacyMarkerPrefix);
+  if (start < 0) return _LegacyOfferMetadata(description: value);
+
+  final markerEnd = trimmed.indexOf(_legacyMarkerSuffix, start);
+  if (markerEnd < 0 ||
+      markerEnd != trimmed.length - _legacyMarkerSuffix.length) {
+    return _LegacyOfferMetadata(description: value);
+  }
+
+  final encoded = trimmed.substring(
+    start + _legacyMarkerPrefix.length,
+    markerEnd,
+  );
+  try {
+    final decoded = utf8.decode(base64Url.decode(encoded));
+    final json = jsonDecode(decoded);
+    if (json is! Map) return _LegacyOfferMetadata(description: value);
+    return _LegacyOfferMetadata(
+      description: trimmed.substring(0, start).trimRight(),
+      offerType: OfferType.fromValue(json['offer_type']),
+      redemptionCode: json['redemption_code']?.toString().trim() ?? '',
+    );
+  } catch (_) {
+    return _LegacyOfferMetadata(description: value);
+  }
 }
