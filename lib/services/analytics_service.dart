@@ -14,6 +14,22 @@ class AnalyticsException implements Exception {
   String toString() => message;
 }
 
+enum OfferType {
+  study('study'),
+  promotion('promotion');
+
+  const OfferType(this.value);
+
+  final String value;
+
+  bool get isStudy => this == OfferType.study;
+  bool get isPromotion => this == OfferType.promotion;
+
+  static OfferType fromValue(Object? value) {
+    return value?.toString() == promotion.value ? promotion : study;
+  }
+}
+
 /// The single business owned by the signed-in user.
 class OwnedBusiness {
   const OwnedBusiness({
@@ -173,8 +189,13 @@ class DealPerformance {
     required this.businessId,
     required this.title,
     required this.description,
+    required this.offerType,
     required this.requiredMinutes,
+    required this.redemptionCode,
     required this.isActive,
+    this.startsAt,
+    this.endsAt,
+    required this.redemptions,
     required this.studentsStarted,
     required this.studentsUnlocked,
     required this.averageProgress,
@@ -185,22 +206,33 @@ class DealPerformance {
   final String businessId;
   final String title;
   final String description;
+  final OfferType offerType;
   final int requiredMinutes;
+  final String redemptionCode;
   final bool isActive;
+  final DateTime? startsAt;
+  final DateTime? endsAt;
+  final int redemptions;
   final int studentsStarted;
   final int studentsUnlocked;
   final double averageProgress; // 0..1
   final bool privacyLimited;
 
   double get requiredHours => requiredMinutes / 60.0;
+  bool get isPromotion => offerType.isPromotion;
 
   factory DealPerformance.fromMap(Map<String, dynamic> map) => DealPerformance(
     id: _text(map['offer_id'], fallback: _text(map['id'])),
     businessId: _text(map['business_id']),
     title: _text(map['title'], fallback: 'Deal'),
     description: _text(map['description']),
+    offerType: OfferType.fromValue(map['offer_type']),
     requiredMinutes: _int(map['required_minutes']),
+    redemptionCode: _text(map['redemption_code']),
     isActive: map['is_active'] as bool? ?? true,
+    startsAt: DateTime.tryParse(_text(map['starts_at'])),
+    endsAt: DateTime.tryParse(_text(map['ends_at'])),
+    redemptions: _int(map['redemptions']),
     studentsStarted: _int(map['students_started']),
     studentsUnlocked: _int(map['students_unlocked']),
     averageProgress: _ratio(map['average_progress']),
@@ -364,11 +396,20 @@ class AnalyticsService {
     required String businessId,
     required String title,
     required String description,
+    required OfferType offerType,
     required int requiredMinutes,
+    required String redemptionCode,
+    required DateTime startsAt,
+    required DateTime endsAt,
     required bool isActive,
   }) async {
     if (_uid == null) {
       throw const AnalyticsException('Please sign in again to manage rewards.');
+    }
+    if (!endsAt.isAfter(startsAt)) {
+      throw const AnalyticsException(
+        'Offer end time must be after start time.',
+      );
     }
 
     final values = <String, dynamic>{
@@ -380,7 +421,15 @@ class AnalyticsService {
         max: 500,
         required: false,
       ),
-      'required_minutes': _requiredMinutes(requiredMinutes),
+      'offer_type': offerType.value,
+      'required_minutes': _requiredMinutes(requiredMinutes, offerType),
+      'redemption_code': _cleanText(
+        redemptionCode,
+        field: 'POS coupon code',
+        max: 80,
+      ),
+      'starts_at': startsAt.toUtc().toIso8601String(),
+      'ends_at': endsAt.toUtc().toIso8601String(),
       'is_active': isActive,
     };
 
@@ -466,7 +515,7 @@ class AnalyticsService {
     }
     if (text.contains('violates check constraint') ||
         text.contains('offers_title_check')) {
-      return 'Check the offer title, description, and required hours.';
+      return 'Check the offer title, type, run window, study time, and POS coupon code.';
     }
     if (text.contains('permission denied') ||
         text.contains('offers') && text.contains('not found')) {
@@ -491,7 +540,8 @@ class AnalyticsService {
     return normalized;
   }
 
-  int _requiredMinutes(int value) {
+  int _requiredMinutes(int value, OfferType offerType) {
+    if (offerType.isPromotion) return 0;
     if (value < 1) {
       throw const AnalyticsException(
         'Required study time must be at least 1 minute.',

@@ -650,6 +650,10 @@ class DealCard extends StatelessWidget {
         ? 0
         : deal.studentsUnlocked / deal.studentsStarted;
     final double progress = deal.averageProgress.clamp(0.0, 1.0);
+    final bool isPromo = deal.isPromotion;
+    final String unlockLabel = isPromo
+        ? 'No study required'
+        : '${deal.requiredHours.toStringAsFixed(deal.requiredHours % 1 == 0 ? 0 : 1)} h to unlock';
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -678,9 +682,19 @@ class DealCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 2),
-          Text(
-            '${deal.requiredHours.toStringAsFixed(deal.requiredHours % 1 == 0 ? 0 : 1)} h to unlock',
-            style: GoogleFonts.inter(fontSize: 12, color: AppColors.mocha),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: <Widget>[
+              _OfferBadge(
+                label: isPromo ? 'Walk-in promo' : 'Study reward',
+                icon: isPromo
+                    ? Icons.local_offer_rounded
+                    : Icons.timer_outlined,
+                selected: isPromo,
+              ),
+              _OfferBadge(label: unlockLabel, icon: Icons.school_outlined),
+            ],
           ),
           if (deal.description.isNotEmpty)
             Padding(
@@ -696,60 +710,125 @@ class DealCard extends StatelessWidget {
                 ),
               ),
             ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: <Widget>[
+              if (deal.redemptionCode.isNotEmpty)
+                _OfferBadge(
+                  label: 'POS ${deal.redemptionCode}',
+                  icon: Icons.point_of_sale_rounded,
+                ),
+              if (deal.endsAt != null)
+                _OfferBadge(
+                  label: 'Until ${_dateLabel(deal.endsAt!)}',
+                  icon: Icons.event_outlined,
+                ),
+            ],
+          ),
           const SizedBox(height: 16),
           Wrap(
             spacing: 22,
             runSpacing: 12,
             children: <Widget>[
-              _MiniStat(
-                value: compactInt(deal.studentsStarted),
-                label: 'Started',
-              ),
-              _MiniStat(
-                value: compactInt(deal.studentsUnlocked),
-                label: 'Unlocked',
-              ),
-              _MiniStat(
-                value: '${(conversion * 100).toStringAsFixed(0)}%',
-                label: 'Conversion',
-              ),
+              if (isPromo) ...<Widget>[
+                _MiniStat(
+                  value: compactInt(deal.redemptions),
+                  label: 'Redeemed',
+                ),
+                _MiniStat(
+                  value: deal.isActive ? 'On' : 'Off',
+                  label: 'Visibility',
+                ),
+              ] else ...<Widget>[
+                _MiniStat(
+                  value: compactInt(deal.studentsStarted),
+                  label: 'Started',
+                ),
+                _MiniStat(
+                  value: compactInt(deal.studentsUnlocked),
+                  label: 'Unlocked',
+                ),
+                _MiniStat(
+                  value: compactInt(deal.redemptions),
+                  label: 'Redeemed',
+                ),
+                _MiniStat(
+                  value: '${(conversion * 100).toStringAsFixed(0)}%',
+                  label: 'Conversion',
+                ),
+              ],
             ],
           ),
-          const SizedBox(height: 16),
-          Row(
-            children: <Widget>[
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 8,
-                    backgroundColor: AppColors.espresso.withValues(alpha: 0.06),
-                    valueColor: const AlwaysStoppedAnimation<Color>(
-                      AppColors.forest,
+          if (!isPromo) ...<Widget>[
+            const SizedBox(height: 16),
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 8,
+                      backgroundColor: AppColors.espresso.withValues(
+                        alpha: 0.06,
+                      ),
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        AppColors.forest,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                '${(progress * 100).toStringAsFixed(0)}%',
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.espresso,
-                  fontFeatures: const <FontFeature>[
-                    FontFeature.tabularFigures(),
-                  ],
+                const SizedBox(width: 10),
+                Text(
+                  '${(progress * 100).toStringAsFixed(0)}%',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.espresso,
+                    fontFeatures: const <FontFeature>[
+                      FontFeature.tabularFigures(),
+                    ],
+                  ),
                 ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Average progress',
+              style: GoogleFonts.inter(fontSize: 11.5, color: AppColors.mocha),
+            ),
+          ] else ...<Widget>[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.forest.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
               ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Average progress',
-            style: GoogleFonts.inter(fontSize: 11.5, color: AppColors.mocha),
-          ),
+              child: Row(
+                children: <Widget>[
+                  const Icon(
+                    Icons.storefront_rounded,
+                    size: 16,
+                    color: AppColors.forestDark,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Redeemable in person as soon as students see it.',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        height: 1.35,
+                        color: AppColors.forestDark,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           if (deal.privacyLimited)
             Padding(
               padding: const EdgeInsets.only(top: 12),
@@ -843,6 +922,56 @@ class DealCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _OfferBadge extends StatelessWidget {
+  const _OfferBadge({
+    required this.label,
+    required this.icon,
+    this.selected = false,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color foreground = selected ? AppColors.forestDark : AppColors.mocha;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: selected
+            ? AppColors.forest.withValues(alpha: 0.08)
+            : AppColors.latte.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Icon(icon, size: 13, color: foreground),
+          const SizedBox(width: 5),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 170),
+            child: Text(
+              label,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                color: foreground,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _dateLabel(DateTime value) {
+  final DateTime local = value.toLocal();
+  return '${local.month}/${local.day}/${local.year}';
 }
 
 class _MiniStat extends StatelessWidget {

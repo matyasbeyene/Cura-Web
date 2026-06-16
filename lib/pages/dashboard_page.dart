@@ -429,7 +429,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
       _SectionHeader(
         title: 'Reward performance',
-        subtitle: 'Offer starts, unlocks, and average progress.',
+        subtitle: 'Study rewards, walk-in promos, and redemptions.',
         trailing: FilledButton.icon(
           onPressed: _creatingOffer ? null : () => _editOffer(),
           icon: const Icon(Icons.add_rounded, size: 18),
@@ -449,14 +449,14 @@ class _DashboardPageState extends State<DashboardPage> {
         const DashboardCard(
           child: DashboardEmptyState(
             icon: Icons.card_giftcard_outlined,
-            message: 'No offers yet. Add one to start rewarding study time.',
+            message: 'No offers yet. Add a study reward or walk-in promo.',
           ),
         )
       else
         _grid(
           minWidth: 310,
           gap: 14,
-          itemHeight: 420,
+          itemHeight: 450,
           children: <Widget>[
             for (final deal in data.deals)
               DealCard(
@@ -550,7 +550,11 @@ class _DashboardPageState extends State<DashboardPage> {
         businessId: business.id,
         title: result.title,
         description: result.description,
+        offerType: result.offerType,
         requiredMinutes: result.requiredMinutes,
+        redemptionCode: result.redemptionCode,
+        startsAt: result.startsAt,
+        endsAt: result.endsAt,
         isActive: result.isActive,
       );
       if (!mounted) return;
@@ -712,13 +716,21 @@ class _OfferFormValue {
   const _OfferFormValue({
     required this.title,
     required this.description,
+    required this.offerType,
     required this.requiredMinutes,
+    required this.redemptionCode,
+    required this.startsAt,
+    required this.endsAt,
     required this.isActive,
   });
 
   final String title;
   final String description;
+  final OfferType offerType;
   final int requiredMinutes;
+  final String redemptionCode;
+  final DateTime startsAt;
+  final DateTime endsAt;
   final bool isActive;
 }
 
@@ -736,17 +748,28 @@ class _OfferEditorDialogState extends State<_OfferEditorDialog> {
   late final TextEditingController _title;
   late final TextEditingController _description;
   late final TextEditingController _hours;
+  late final TextEditingController _duration;
+  late final TextEditingController _redemptionCode;
+  late OfferType _offerType;
+  late _RunUnit _runUnit;
   late bool _isActive;
 
   @override
   void initState() {
     super.initState();
     final deal = widget.deal;
+    final initialRunLength = _initialRunLength(deal);
     _title = TextEditingController(text: deal?.title ?? '');
     _description = TextEditingController(text: deal?.description ?? '');
     _hours = TextEditingController(
-      text: deal == null ? '' : _formatHoursForInput(deal.requiredHours),
+      text: deal == null || deal.isPromotion
+          ? ''
+          : _formatHoursForInput(deal.requiredHours),
     );
+    _duration = TextEditingController(text: initialRunLength.$1.toString());
+    _redemptionCode = TextEditingController(text: deal?.redemptionCode ?? '');
+    _offerType = deal?.offerType ?? OfferType.study;
+    _runUnit = initialRunLength.$2;
     _isActive = deal?.isActive ?? true;
   }
 
@@ -755,6 +778,8 @@ class _OfferEditorDialogState extends State<_OfferEditorDialog> {
     _title.dispose();
     _description.dispose();
     _hours.dispose();
+    _duration.dispose();
+    _redemptionCode.dispose();
     super.dispose();
   }
 
@@ -764,7 +789,7 @@ class _OfferEditorDialogState extends State<_OfferEditorDialog> {
     return AlertDialog(
       title: Text(editing ? 'Edit offer' : 'New offer'),
       content: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 460),
+        constraints: const BoxConstraints(maxWidth: 560),
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
@@ -772,6 +797,34 @@ class _OfferEditorDialogState extends State<_OfferEditorDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
+                _DialogSection(
+                  icon: Icons.tune_rounded,
+                  title: 'Offer kind',
+                  child: Column(
+                    children: <Widget>[
+                      _OfferTypeOption(
+                        type: OfferType.study,
+                        selected: _offerType == OfferType.study,
+                        title: 'Study reward',
+                        body:
+                            'Students unlock this after studying at your location.',
+                        icon: Icons.timer_rounded,
+                        onTap: _setOfferType,
+                      ),
+                      const SizedBox(height: 10),
+                      _OfferTypeOption(
+                        type: OfferType.promotion,
+                        selected: _offerType == OfferType.promotion,
+                        title: 'Walk-in promo',
+                        body:
+                            'Students can redeem this in person without study time.',
+                        icon: Icons.local_offer_rounded,
+                        onTap: _setOfferType,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
                 TextFormField(
                   controller: _title,
                   textInputAction: TextInputAction.next,
@@ -806,26 +859,80 @@ class _OfferEditorDialogState extends State<_OfferEditorDialog> {
                   },
                 ),
                 const SizedBox(height: 16),
-                TextFormField(
-                  controller: _hours,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
+                if (_offerType.isStudy) ...<Widget>[
+                  TextFormField(
+                    controller: _hours,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: 'Study time required',
+                      suffixText: 'hours',
+                      helperText: 'Example: 2.5 means 2 hours 30 minutes.',
+                    ),
+                    validator: (value) {
+                      final hours = double.tryParse(value?.trim() ?? '');
+                      if (hours == null || hours <= 0) {
+                        return 'Enter a study time above 0.';
+                      }
+                      if ((hours * 60).round() > 100000) {
+                        return 'Use a smaller study time.';
+                      }
+                      return null;
+                    },
                   ),
-                  decoration: const InputDecoration(
-                    labelText: 'Study time required',
-                    suffixText: 'hours',
-                    helperText: 'Example: 2.5 means 2 hours 30 minutes.',
+                  const SizedBox(height: 16),
+                ],
+                _DialogSection(
+                  icon: Icons.event_rounded,
+                  title: 'Run length',
+                  subtitle: 'Choose how long students can see and redeem it.',
+                  child: Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: TextFormField(
+                          controller: _duration,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Length',
+                          ),
+                          validator: _validateDuration,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      DropdownButton<_RunUnit>(
+                        value: _runUnit,
+                        items: <DropdownMenuItem<_RunUnit>>[
+                          for (final unit in _RunUnit.values)
+                            DropdownMenuItem<_RunUnit>(
+                              value: unit,
+                              child: Text(unit.label),
+                            ),
+                        ],
+                        onChanged: (unit) {
+                          if (unit != null) {
+                            setState(() => _runUnit = unit);
+                          }
+                        },
+                      ),
+                    ],
                   ),
-                  validator: (value) {
-                    final hours = double.tryParse(value?.trim() ?? '');
-                    if (hours == null || hours <= 0) {
-                      return 'Enter a study time above 0.';
-                    }
-                    if ((hours * 60).round() > 100000) {
-                      return 'Use a smaller study time.';
-                    }
-                    return null;
-                  },
+                ),
+                const SizedBox(height: 16),
+                _DialogSection(
+                  icon: Icons.point_of_sale_rounded,
+                  title: 'POS coupon code',
+                  subtitle:
+                      'Create this coupon in your POS first. The barista will see this exact code when a student redeems.',
+                  child: TextFormField(
+                    controller: _redemptionCode,
+                    textCapitalization: TextCapitalization.characters,
+                    decoration: const InputDecoration(
+                      labelText: 'Coupon code',
+                      hintText: 'CURA-LATTE',
+                    ),
+                    validator: _validateCode,
+                  ),
                 ),
                 const SizedBox(height: 10),
                 SwitchListTile(
@@ -874,20 +981,223 @@ class _OfferEditorDialogState extends State<_OfferEditorDialog> {
 
   void _submit() {
     if (_formKey.currentState?.validate() != true) return;
-    final hours = double.parse(_hours.text.trim());
+    final hours = _offerType.isStudy ? double.parse(_hours.text.trim()) : 0.0;
+    final now = DateTime.now().toUtc();
+    final startsAt = widget.deal?.startsAt?.toUtc() ?? now;
     Navigator.of(context).pop(
       _OfferFormValue(
         title: _title.text.trim(),
         description: _description.text.trim(),
-        requiredMinutes: (hours * 60).round().clamp(1, 100000),
+        offerType: _offerType,
+        requiredMinutes: _offerType.isStudy
+            ? (hours * 60).round().clamp(1, 100000).toInt()
+            : 0,
+        redemptionCode: _redemptionCode.text.trim(),
+        startsAt: startsAt,
+        endsAt: now.add(_runDuration()),
         isActive: _isActive,
       ),
     );
   }
 
+  void _setOfferType(OfferType type) => setState(() => _offerType = type);
+
+  String? _validateDuration(String? value) {
+    final amount = int.tryParse(value?.trim() ?? '');
+    if (amount == null || amount <= 0) return 'Enter a run length.';
+    if (_runUnit == _RunUnit.hours && amount > 720) {
+      return 'Use days or weeks for longer runs.';
+    }
+    if (_runUnit == _RunUnit.weeks && amount > 52) {
+      return 'Use 52 weeks or fewer.';
+    }
+    return null;
+  }
+
+  String? _validateCode(String? value) {
+    final text = value?.trim() ?? '';
+    if (text.isEmpty) return 'Enter the POS coupon code.';
+    if (text.length > 80) return 'Use 80 characters or fewer.';
+    return null;
+  }
+
+  Duration _runDuration() {
+    final amount = int.tryParse(_duration.text.trim()) ?? 1;
+    return _runUnit.duration(amount);
+  }
+
+  (int, _RunUnit) _initialRunLength(DealPerformance? deal) {
+    final endsAt = deal?.endsAt;
+    if (endsAt == null) return (7, _RunUnit.days);
+    final remaining = endsAt.difference(DateTime.now());
+    final safeRemaining = remaining.isNegative
+        ? const Duration(days: 7)
+        : remaining;
+    if (safeRemaining.inHours < 48) {
+      return (safeRemaining.inHours.clamp(1, 720).toInt(), _RunUnit.hours);
+    }
+    if (safeRemaining.inDays >= 14 && safeRemaining.inDays % 7 == 0) {
+      return ((safeRemaining.inDays ~/ 7).clamp(1, 52).toInt(), _RunUnit.weeks);
+    }
+    return (safeRemaining.inDays.clamp(1, 365).toInt(), _RunUnit.days);
+  }
+
   String _formatHoursForInput(double hours) {
     if (hours % 1 == 0) return hours.toStringAsFixed(0);
     return hours.toStringAsFixed(2).replaceFirst(RegExp(r'0+$'), '');
+  }
+}
+
+enum _RunUnit {
+  hours('hours'),
+  days('days'),
+  weeks('weeks');
+
+  const _RunUnit(this.label);
+
+  final String label;
+
+  Duration duration(int amount) {
+    return switch (this) {
+      _RunUnit.hours => Duration(hours: amount),
+      _RunUnit.days => Duration(days: amount),
+      _RunUnit.weeks => Duration(days: amount * 7),
+    };
+  }
+}
+
+class _DialogSection extends StatelessWidget {
+  const _DialogSection({
+    required this.icon,
+    required this.title,
+    required this.child,
+    this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.latte.withValues(alpha: 0.42),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.espresso.withValues(alpha: 0.08)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Icon(icon, color: AppColors.espresso, size: 18),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.espresso,
+                ),
+              ),
+            ],
+          ),
+          if (subtitle != null) ...<Widget>[
+            const SizedBox(height: 6),
+            Text(
+              subtitle!,
+              style: GoogleFonts.inter(
+                fontSize: 12.5,
+                height: 1.35,
+                color: AppColors.mocha,
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _OfferTypeOption extends StatelessWidget {
+  const _OfferTypeOption({
+    required this.type,
+    required this.selected,
+    required this.title,
+    required this.body,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final OfferType type;
+  final bool selected;
+  final String title;
+  final String body;
+  final IconData icon;
+  final ValueChanged<OfferType> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color border = selected
+        ? AppColors.espresso.withValues(alpha: 0.34)
+        : AppColors.espresso.withValues(alpha: 0.08);
+    final Color fill = selected
+        ? AppColors.cream
+        : AppColors.white.withValues(alpha: 0.62);
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () => onTap(type),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: fill,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: border),
+        ),
+        child: Row(
+          children: <Widget>[
+            Icon(icon, color: AppColors.espresso, size: 22),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    title,
+                    style: GoogleFonts.inter(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.warmBlack,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    body,
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      height: 1.35,
+                      color: AppColors.mocha,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              selected
+                  ? Icons.check_circle_rounded
+                  : Icons.radio_button_unchecked_rounded,
+              color: selected ? AppColors.espresso : AppColors.mocha,
+              size: 22,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

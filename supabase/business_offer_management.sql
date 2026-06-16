@@ -14,6 +14,44 @@ begin
   end if;
 end $$;
 
+alter table public.offers add column if not exists offer_type text not null default 'study';
+alter table public.offers add column if not exists redemption_code text;
+alter table public.offers add column if not exists starts_at timestamptz;
+alter table public.offers add column if not exists ends_at timestamptz;
+
+alter table public.offers drop constraint if exists offers_type_check;
+alter table public.offers add constraint offers_type_check
+  check (offer_type in ('study', 'promotion'))
+  not valid;
+
+alter table public.offers drop constraint if exists offers_required_minutes_check;
+alter table public.offers add constraint offers_required_minutes_check
+  check (
+    required_minutes is null
+    or (
+      offer_type = 'study'
+      and required_minutes between 1 and 100000
+    )
+    or (
+      offer_type = 'promotion'
+      and required_minutes = 0
+    )
+  )
+  not valid;
+
+alter table public.offers drop constraint if exists offers_redemption_code_check;
+alter table public.offers add constraint offers_redemption_code_check
+  check (
+    redemption_code is null
+    or length(trim(redemption_code)) between 1 and 80
+  )
+  not valid;
+
+alter table public.offers drop constraint if exists offers_window_check;
+alter table public.offers add constraint offers_window_check
+  check (starts_at is null or ends_at is null or starts_at < ends_at)
+  not valid;
+
 alter table public.offers enable row level security;
 
 drop policy if exists "Read active offers" on public.offers;
@@ -75,4 +113,18 @@ create policy "Owner deletes own offers"
     )
   );
 
-grant select, insert, update, delete on public.offers to authenticated;
+revoke select on public.offers from authenticated;
+grant select (
+  id,
+  business_id,
+  title,
+  description,
+  offer_type,
+  required_minutes,
+  is_active,
+  starts_at,
+  ends_at,
+  created_at,
+  updated_at
+) on public.offers to authenticated;
+grant insert, update, delete on public.offers to authenticated;
