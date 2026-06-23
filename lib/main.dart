@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'config/supabase_config.dart';
 import 'pages/dashboard_page.dart';
 import 'pages/landing_page.dart';
+import 'pages/privacy_policy_page.dart';
 import 'pages/sign_in_page.dart';
 import 'theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  usePathUrlStrategy();
   await Supabase.initialize(
     url: SupabaseConfig.url,
     publishableKey: SupabaseConfig.publishableKey,
@@ -33,6 +36,11 @@ final GoRouter _router = GoRouter(
       path: '/dashboard',
       builder: (BuildContext context, GoRouterState state) =>
           const DashboardPage(),
+    ),
+    GoRoute(
+      path: '/privacy-policy',
+      builder: (BuildContext context, GoRouterState state) =>
+          const PrivacyPolicyPage(),
     ),
   ],
 );

@@ -621,12 +621,42 @@ class _CtaSection extends StatelessWidget {
                 else
                   const AppStoreBadge(),
                 const SizedBox(height: 80),
-                Text(
-                  copy.footer,
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    color: AppColors.cream.withValues(alpha: 0.6),
-                  ),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 14,
+                  runSpacing: 8,
+                  children: <Widget>[
+                    Text(
+                      copy.footer,
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        color: AppColors.cream.withValues(alpha: 0.6),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => context.go('/privacy-policy'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.cream.withValues(
+                          alpha: 0.82,
+                        ),
+                        minimumSize: Size.zero,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 6,
+                        ),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: Text(
+                        'Privacy Policy',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

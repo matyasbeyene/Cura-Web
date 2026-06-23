@@ -17,3 +17,11 @@ flutter run -d chrome
 flutter analyze
 flutter test
 ```
+
+## Privacy Policy
+
+The public privacy policy route is `/privacy-policy`.
+
+Update the policy text in `web/legal/privacy-policy.md`. The route renders that
+editable Markdown source directly, so the website can be updated without
+changing the page layout.

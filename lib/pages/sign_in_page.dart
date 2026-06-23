@@ -98,7 +98,7 @@ class _SignInPageState extends State<SignInPage> {
       // On web this redirects the page to Google and back to the app origin.
       await _supabase.auth.signInWithOAuth(
         OAuthProvider.google,
-        redirectTo: '${Uri.base.origin}/#$_returnPath',
+        redirectTo: '${Uri.base.origin}$_returnPath',
       );
     } on AuthException catch (e) {
       if (mounted) setState(() => _error = e.message);
