@@ -11,7 +11,7 @@ class AppColors {
   static const Color latte = Color(0xFFE8DCC8); // light tan
   static const Color cream = Color(0xFFFAF6EF); // off-white background
   static const Color white = Color(0xFFFFFFFF);
-  static const Color border = Color(0xFFD2D2D2); // video border / page surround
+  static const Color border = Color(0xFFFFFFFF); // video/page surround
   static const Color warmBlack = Color(0xFF1A1410); // near-black, warm
   static const Color forest = Color(0xFF3A5A40); // forest green accent
   static const Color forestDark = Color(0xFF2F4A37);
