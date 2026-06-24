@@ -288,10 +288,7 @@ const _LandingCopy _studentCopy = _LandingCopy(
   scrollQuotes: kStudentScrollQuotes,
   introTitle: 'Find your next focus spot.',
   introBody:
-      'Cura helps students find places to study, stay on task, '
-      'and earn simple rewards. The web portal gives partners a '
-      'clear view of how students use their space, without showing '
-      'private student data.',
+      'Cura helps students build better focus habits by encouraging them to study at productive locations around campus. Earn rewards from local businesses while discovering new places to learn, work, and grow.',
   featuresTitle: 'Study better with Cura',
   features: <_FeatureCopy>[
     _FeatureCopy(
