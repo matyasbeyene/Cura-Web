@@ -24,14 +24,12 @@ class TopNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double width = MediaQuery.of(context).size.width;
     final double t = scrolled.clamp(0.0, 1.0);
     final Color barColor = AppColors.cream.withValues(alpha: 0.94 * t);
     const Color fg = AppColors.espresso;
-    final bool wide = width >= 760;
-    final bool compact = width < 390;
+    final bool wide = MediaQuery.of(context).size.width >= 760;
+    final bool compact = MediaQuery.of(context).size.width < 390;
     final bool businessView = audience == SiteAudience.business;
-    final bool showNavBadge = !compact && (!businessView || width >= 650);
 
     return Container(
       color: barColor,
@@ -51,10 +49,6 @@ class TopNav extends StatelessWidget {
                   color: fg,
                 ),
               ),
-              if (showNavBadge) ...<Widget>[
-                SizedBox(width: wide ? 18 : 12),
-                AppStoreBadge(compact: !wide),
-              ],
               const Spacer(),
               if (businessView) ...<Widget>[
                 _AudienceButton(
@@ -182,34 +176,29 @@ class _DashboardButton extends StatelessWidget {
 /// functional; for production, swap in Apple's official downloadable badge
 /// asset (their guidelines require the official artwork).
 class AppStoreBadge extends StatelessWidget {
-  const AppStoreBadge({super.key, this.onTap, this.compact = false});
+  const AppStoreBadge({super.key, this.onTap});
 
   final VoidCallback? onTap;
-  final bool compact;
 
   @override
   Widget build(BuildContext context) {
-    final double height = compact ? 40 : 46;
-    final double iconSize = compact ? 24 : 28;
-    final double labelSize = compact ? 8 : 9;
-    final double titleSize = compact ? 15 : 18;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         onTap: onTap ?? () {},
         child: Container(
-          height: height,
-          padding: EdgeInsets.symmetric(horizontal: compact ? 11 : 14),
+          height: 46,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
           decoration: BoxDecoration(
             color: Colors.black,
-            borderRadius: BorderRadius.circular(compact ? 8 : 9),
+            borderRadius: BorderRadius.circular(9),
             border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Icon(Icons.apple, color: Colors.white, size: iconSize),
-              SizedBox(width: compact ? 7 : 9),
+              const Icon(Icons.apple, color: Colors.white, size: 28),
+              const SizedBox(width: 9),
               Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -218,7 +207,7 @@ class AppStoreBadge extends StatelessWidget {
                     'Download on the',
                     style: GoogleFonts.inter(
                       color: Colors.white,
-                      fontSize: labelSize,
+                      fontSize: 9,
                       height: 1.15,
                     ),
                   ),
@@ -226,10 +215,10 @@ class AppStoreBadge extends StatelessWidget {
                     'App Store',
                     style: GoogleFonts.inter(
                       color: Colors.white,
-                      fontSize: titleSize,
+                      fontSize: 18,
                       height: 1.1,
                       fontWeight: FontWeight.w600,
-                      letterSpacing: 0,
+                      letterSpacing: -0.3,
                     ),
                   ),
                 ],

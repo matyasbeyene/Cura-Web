@@ -18,9 +18,9 @@ class ScrollQuote {
 
 /// Short lines that move with the hero video.
 const List<ScrollQuote> kStudentScrollQuotes = <ScrollQuote>[
-  ScrollQuote('Study intentionally. Earn real rewards.', QuoteSide.left, 0.12, 0.37),
-  ScrollQuote('Discover new study spots around campus', QuoteSide.right, 0.41, 0.66),
-  ScrollQuote('Make every focus session count', QuoteSide.left, 0.70, 0.825),
+  ScrollQuote('Find a place that helps you focus.', QuoteSide.left, 0.12, 0.37),
+  ScrollQuote('Start a session. Stay with it.', QuoteSide.right, 0.41, 0.66),
+  ScrollQuote('Earn rewards for showing up.', QuoteSide.left, 0.70, 0.825),
 ];
 
 const List<ScrollQuote> kBusinessScrollQuotes = <ScrollQuote>[
