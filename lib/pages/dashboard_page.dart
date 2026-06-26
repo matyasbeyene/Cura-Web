@@ -429,7 +429,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
       _SectionHeader(
         title: 'Reward performance',
-        subtitle: 'Study rewards, walk-in promos, and redemptions.',
+        subtitle: 'Cura-points offers and redemptions.',
         trailing: FilledButton.icon(
           onPressed: _creatingOffer ? null : () => _editOffer(),
           icon: const Icon(Icons.add_rounded, size: 18),
@@ -449,7 +449,7 @@ class _DashboardPageState extends State<DashboardPage> {
         const DashboardCard(
           child: DashboardEmptyState(
             icon: Icons.card_giftcard_outlined,
-            message: 'No offers yet. Add a study reward or walk-in promo.',
+            message: 'No offers yet. Add a Cura-points offer.',
           ),
         )
       else
@@ -550,8 +550,8 @@ class _DashboardPageState extends State<DashboardPage> {
         businessId: business.id,
         title: result.title,
         description: result.description,
-        offerType: result.offerType,
-        requiredMinutes: result.requiredMinutes,
+        discountKind: result.discountKind,
+        discountValue: result.discountValue,
         redemptionCode: result.redemptionCode,
         startsAt: result.startsAt,
         endsAt: result.endsAt,
@@ -716,8 +716,8 @@ class _OfferFormValue {
   const _OfferFormValue({
     required this.title,
     required this.description,
-    required this.offerType,
-    required this.requiredMinutes,
+    required this.discountKind,
+    required this.discountValue,
     required this.redemptionCode,
     required this.startsAt,
     required this.endsAt,
@@ -726,8 +726,8 @@ class _OfferFormValue {
 
   final String title;
   final String description;
-  final OfferType offerType;
-  final int requiredMinutes;
+  final String discountKind;
+  final double? discountValue;
   final String redemptionCode;
   final DateTime startsAt;
   final DateTime endsAt;
@@ -747,10 +747,10 @@ class _OfferEditorDialogState extends State<_OfferEditorDialog> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _title;
   late final TextEditingController _description;
-  late final TextEditingController _hours;
+  late final TextEditingController _discountValue;
   late final TextEditingController _duration;
   late final TextEditingController _redemptionCode;
-  late OfferType _offerType;
+  late String _discountKind;
   late _RunUnit _runUnit;
   late bool _isActive;
 
@@ -761,14 +761,14 @@ class _OfferEditorDialogState extends State<_OfferEditorDialog> {
     final initialRunLength = _initialRunLength(deal);
     _title = TextEditingController(text: deal?.title ?? '');
     _description = TextEditingController(text: deal?.description ?? '');
-    _hours = TextEditingController(
-      text: deal == null || deal.isPromotion
-          ? ''
-          : _formatHoursForInput(deal.requiredHours),
+    _discountKind = deal?.discountKind ?? 'dollar';
+    _discountValue = TextEditingController(
+      text: deal != null && deal.discountValue != null
+          ? _trimNum(deal.discountValue!)
+          : '',
     );
     _duration = TextEditingController(text: initialRunLength.$1.toString());
     _redemptionCode = TextEditingController(text: deal?.redemptionCode ?? '');
-    _offerType = deal?.offerType ?? OfferType.study;
     _runUnit = initialRunLength.$2;
     _isActive = deal?.isActive ?? true;
   }
@@ -777,7 +777,7 @@ class _OfferEditorDialogState extends State<_OfferEditorDialog> {
   void dispose() {
     _title.dispose();
     _description.dispose();
-    _hours.dispose();
+    _discountValue.dispose();
     _duration.dispose();
     _redemptionCode.dispose();
     super.dispose();
@@ -797,34 +797,6 @@ class _OfferEditorDialogState extends State<_OfferEditorDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                _DialogSection(
-                  icon: Icons.tune_rounded,
-                  title: 'Offer kind',
-                  child: Column(
-                    children: <Widget>[
-                      _OfferTypeOption(
-                        type: OfferType.study,
-                        selected: _offerType == OfferType.study,
-                        title: 'Study reward',
-                        body:
-                            'Students unlock this after studying at your location.',
-                        icon: Icons.timer_rounded,
-                        onTap: _setOfferType,
-                      ),
-                      const SizedBox(height: 10),
-                      _OfferTypeOption(
-                        type: OfferType.promotion,
-                        selected: _offerType == OfferType.promotion,
-                        title: 'Walk-in promo',
-                        body:
-                            'Students can redeem this in person without study time.',
-                        icon: Icons.local_offer_rounded,
-                        onTap: _setOfferType,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
                 TextFormField(
                   controller: _title,
                   textInputAction: TextInputAction.next,
@@ -859,30 +831,56 @@ class _OfferEditorDialogState extends State<_OfferEditorDialog> {
                   },
                 ),
                 const SizedBox(height: 16),
-                if (_offerType.isStudy) ...<Widget>[
-                  TextFormField(
-                    controller: _hours,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    decoration: const InputDecoration(
-                      labelText: 'Study time required',
-                      suffixText: 'hours',
-                      helperText: 'Example: 2.5 means 2 hours 30 minutes.',
-                    ),
-                    validator: (value) {
-                      final hours = double.tryParse(value?.trim() ?? '');
-                      if (hours == null || hours <= 0) {
-                        return 'Enter a study time above 0.';
-                      }
-                      if ((hours * 60).round() > 100000) {
-                        return 'Use a smaller study time.';
-                      }
-                      return null;
-                    },
+                _DialogSection(
+                  icon: Icons.sell_rounded,
+                  title: 'Discount & Cura points',
+                  subtitle:
+                      'Students spend Cura points to redeem. \$1 off = 60 points, 1% off = 10 points.',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      Row(
+                        children: <Widget>[
+                          Expanded(
+                            child: _DiscountKindChip(
+                              label: 'Dollars off (\$)',
+                              selected: _discountKind == 'dollar',
+                              onTap: () =>
+                                  setState(() => _discountKind = 'dollar'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _DiscountKindChip(
+                              label: 'Percent off (%)',
+                              selected: _discountKind == 'percent',
+                              onTap: () =>
+                                  setState(() => _discountKind = 'percent'),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _discountValue,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: _discountKind == 'dollar'
+                              ? 'Dollars off'
+                              : 'Percent off',
+                          hintText: _discountKind == 'dollar' ? '2' : '10',
+                        ),
+                        validator: _validateDiscount,
+                        onChanged: (_) => setState(() {}),
+                      ),
+                      const SizedBox(height: 12),
+                      _PointsPreview(points: _computedPoints()),
+                    ],
                   ),
-                  const SizedBox(height: 16),
-                ],
+                ),
+                const SizedBox(height: 16),
                 _DialogSection(
                   icon: Icons.event_rounded,
                   title: 'Run length',
@@ -981,17 +979,14 @@ class _OfferEditorDialogState extends State<_OfferEditorDialog> {
 
   void _submit() {
     if (_formKey.currentState?.validate() != true) return;
-    final hours = _offerType.isStudy ? double.parse(_hours.text.trim()) : 0.0;
     final now = DateTime.now().toUtc();
     final startsAt = widget.deal?.startsAt?.toUtc() ?? now;
     Navigator.of(context).pop(
       _OfferFormValue(
         title: _title.text.trim(),
         description: _description.text.trim(),
-        offerType: _offerType,
-        requiredMinutes: _offerType.isStudy
-            ? (hours * 60).ceil().clamp(1, 100000).toInt()
-            : 0,
+        discountKind: _discountKind,
+        discountValue: double.tryParse(_discountValue.text.trim()),
         redemptionCode: _redemptionCode.text.trim(),
         startsAt: startsAt,
         endsAt: now.add(_runDuration()),
@@ -1000,7 +995,17 @@ class _OfferEditorDialogState extends State<_OfferEditorDialog> {
     );
   }
 
-  void _setOfferType(OfferType type) => setState(() => _offerType = type);
+  String? _validateDiscount(String? value) {
+    final amount = double.tryParse(value?.trim() ?? '');
+    if (amount == null || amount <= 0) return 'Enter a discount amount.';
+    if (_discountKind == 'percent' && amount > 100) {
+      return 'Use 100% or less.';
+    }
+    if (_discountKind == 'dollar' && amount > 1000) {
+      return 'Use \$1000 or less.';
+    }
+    return null;
+  }
 
   String? _validateDuration(String? value) {
     final amount = int.tryParse(value?.trim() ?? '');
@@ -1026,6 +1031,13 @@ class _OfferEditorDialogState extends State<_OfferEditorDialog> {
     return _runUnit.duration(amount);
   }
 
+  int _computedPoints() {
+    final amount = double.tryParse(_discountValue.text.trim());
+    if (amount == null || amount <= 0) return 0;
+    final raw = _discountKind == 'percent' ? amount * 10 : amount * 60;
+    return raw.round().clamp(1, 60000).toInt();
+  }
+
   (int, _RunUnit) _initialRunLength(DealPerformance? deal) {
     final endsAt = deal?.endsAt;
     if (endsAt == null) return (7, _RunUnit.days);
@@ -1042,9 +1054,9 @@ class _OfferEditorDialogState extends State<_OfferEditorDialog> {
     return (safeRemaining.inDays.clamp(1, 365).toInt(), _RunUnit.days);
   }
 
-  String _formatHoursForInput(double hours) {
-    if (hours % 1 == 0) return hours.toStringAsFixed(0);
-    return hours.toStringAsFixed(2).replaceFirst(RegExp(r'0+$'), '');
+  String _trimNum(double value) {
+    if (value % 1 == 0) return value.toStringAsFixed(0);
+    return value.toStringAsFixed(2).replaceFirst(RegExp(r'0+$'), '');
   }
 }
 
@@ -1124,78 +1136,90 @@ class _DialogSection extends StatelessWidget {
   }
 }
 
-class _OfferTypeOption extends StatelessWidget {
-  const _OfferTypeOption({
-    required this.type,
+class _DiscountKindChip extends StatelessWidget {
+  const _DiscountKindChip({
+    required this.label,
     required this.selected,
-    required this.title,
-    required this.body,
-    required this.icon,
     required this.onTap,
   });
 
-  final OfferType type;
+  final String label;
   final bool selected;
-  final String title;
-  final String body;
-  final IconData icon;
-  final ValueChanged<OfferType> onTap;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final Color border = selected
-        ? AppColors.espresso.withValues(alpha: 0.34)
-        : AppColors.espresso.withValues(alpha: 0.08);
-    final Color fill = selected
-        ? AppColors.cream
-        : AppColors.white.withValues(alpha: 0.62);
     return InkWell(
       borderRadius: BorderRadius.circular(12),
-      onTap: () => onTap(type),
+      onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
         decoration: BoxDecoration(
-          color: fill,
+          color: selected ? AppColors.cream : AppColors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: border),
+          border: Border.all(
+            color: selected
+                ? AppColors.espresso.withValues(alpha: 0.32)
+                : AppColors.espresso.withValues(alpha: 0.08),
+          ),
         ),
         child: Row(
           children: <Widget>[
-            Icon(icon, color: AppColors.espresso, size: 22),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    title,
-                    style: GoogleFonts.inter(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.warmBlack,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    body,
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      height: 1.35,
-                      color: AppColors.mocha,
-                    ),
-                  ),
-                ],
-              ),
-            ),
             Icon(
               selected
                   ? Icons.check_circle_rounded
                   : Icons.radio_button_unchecked_rounded,
+              size: 18,
               color: selected ? AppColors.espresso : AppColors.mocha,
-              size: 22,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                label,
+                style: GoogleFonts.inter(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.warmBlack,
+                ),
+              ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _PointsPreview extends StatelessWidget {
+  const _PointsPreview({required this.points});
+
+  final int points;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.forest.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: <Widget>[
+          const Icon(
+            Icons.auto_awesome_rounded,
+            color: AppColors.forestDark,
+            size: 18,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            points > 0 ? '$points Cura points' : 'Enter a discount',
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: AppColors.forestDark,
+            ),
+          ),
+        ],
       ),
     );
   }

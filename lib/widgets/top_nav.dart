@@ -15,20 +15,12 @@ class TopNav extends StatelessWidget {
     required this.audience,
     required this.onAudienceChanged,
     this.onDashboard,
-    this.onContact,
-    this.onDownloadApp,
   });
 
   final double scrolled;
   final SiteAudience audience;
   final ValueChanged<SiteAudience> onAudienceChanged;
   final VoidCallback? onDashboard;
-
-  /// Tapped on the business view's top-left "Contact Us" action.
-  final VoidCallback? onContact;
-
-  /// Tapped on the student view's top-left App Store badge.
-  final VoidCallback? onDownloadApp;
 
   @override
   Widget build(BuildContext context) {
@@ -58,16 +50,6 @@ class TopNav extends StatelessWidget {
                 ),
               ),
               SizedBox(width: wide ? 18 : 10),
-              // Top-left action, just after the logo: the App Store badge for
-              // students, a Contact Us button for businesses.
-              if (businessView)
-                _ContactNavButton(onTap: onContact, compact: !wide)
-              else
-                AppStoreBadge(
-                  onTap: onDownloadApp,
-                  compact: !wide,
-                  scale: 0.75,
-                ),
               const Spacer(),
               if (businessView) ...<Widget>[
                 _AudienceButton(
@@ -218,7 +200,9 @@ class AppStoreBadge extends StatelessWidget {
         onTap: onTap ?? () {},
         child: Container(
           height: (compact ? 40 : 46) * scale,
-          padding: EdgeInsets.symmetric(horizontal: (compact ? 11 : 14) * scale),
+          padding: EdgeInsets.symmetric(
+            horizontal: (compact ? 11 : 14) * scale,
+          ),
           decoration: BoxDecoration(
             color: Colors.black,
             borderRadius: BorderRadius.circular(9 * scale),
@@ -272,46 +256,6 @@ class AppStoreBadge extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Dark, nav-styled "Contact Us" action for the top-left of the business view.
-/// Matches the other nav buttons (so it stays visible over the cream bar) and
-/// collapses to an icon-only button on narrow screens.
-class _ContactNavButton extends StatelessWidget {
-  const _ContactNavButton({this.onTap, required this.compact});
-
-  final VoidCallback? onTap;
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    final ButtonStyle style = FilledButton.styleFrom(
-      backgroundColor: AppColors.espresso,
-      foregroundColor: AppColors.cream,
-      padding: EdgeInsets.symmetric(horizontal: compact ? 12 : 18, vertical: 14),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      side: BorderSide(color: AppColors.latte.withValues(alpha: 0.55)),
-    );
-    if (compact) {
-      return Tooltip(
-        message: 'Contact Us',
-        child: FilledButton(
-          onPressed: onTap ?? () {},
-          style: style,
-          child: const Icon(Icons.mail_rounded, size: 18),
-        ),
-      );
-    }
-    return FilledButton.icon(
-      onPressed: onTap ?? () {},
-      style: style,
-      icon: const Icon(Icons.mail_rounded, size: 18),
-      label: Text(
-        'Contact Us',
-        style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600),
       ),
     );
   }

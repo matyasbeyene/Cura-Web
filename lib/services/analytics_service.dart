@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Business analytics for Cura partner businesses.
@@ -17,18 +15,14 @@ class AnalyticsException implements Exception {
 }
 
 enum OfferType {
-  study('study'),
-  promotion('promotion');
+  points('points');
 
   const OfferType(this.value);
 
   final String value;
 
-  bool get isStudy => this == OfferType.study;
-  bool get isPromotion => this == OfferType.promotion;
-
   static OfferType fromValue(Object? value) {
-    return value?.toString() == promotion.value ? promotion : study;
+    return points;
   }
 }
 
@@ -197,6 +191,9 @@ class DealPerformance {
     required this.isActive,
     this.startsAt,
     this.endsAt,
+    this.discountKind,
+    this.discountValue,
+    this.pointsCost = 0,
     required this.redemptions,
     required this.studentsStarted,
     required this.studentsUnlocked,
@@ -214,33 +211,32 @@ class DealPerformance {
   final bool isActive;
   final DateTime? startsAt;
   final DateTime? endsAt;
+  final String? discountKind;
+  final double? discountValue;
+  final int pointsCost;
   final int redemptions;
   final int studentsStarted;
   final int studentsUnlocked;
   final double averageProgress; // 0..1
   final bool privacyLimited;
 
-  double get requiredHours => requiredMinutes / 60.0;
-  bool get isPromotion => offerType.isPromotion;
-
   factory DealPerformance.fromMap(Map<String, dynamic> map) {
     final legacyMetadata = _parseLegacyOfferMetadata(_text(map['description']));
-    final type =
-        legacyMetadata.offerType ?? OfferType.fromValue(map['offer_type']);
+    final type = OfferType.fromValue(map['offer_type']);
     return DealPerformance(
       id: _text(map['offer_id'], fallback: _text(map['id'])),
       businessId: _text(map['business_id']),
       title: _text(map['title'], fallback: 'Deal'),
       description: legacyMetadata.description,
       offerType: type,
-      requiredMinutes: type.isPromotion ? 0 : _int(map['required_minutes']),
-      redemptionCode: _text(
-        map['redemption_code'],
-        fallback: legacyMetadata.redemptionCode,
-      ),
+      requiredMinutes: 0,
+      redemptionCode: _text(map['redemption_code']),
       isActive: map['is_active'] as bool? ?? true,
       startsAt: DateTime.tryParse(_text(map['starts_at'])),
       endsAt: DateTime.tryParse(_text(map['ends_at'])),
+      discountKind: map['discount_kind'] as String?,
+      discountValue: (map['discount_value'] as num?)?.toDouble(),
+      pointsCost: _int(map['points_cost']),
       redemptions: _int(map['redemptions']),
       studentsStarted: _int(map['students_started']),
       studentsUnlocked: _int(map['students_unlocked']),
@@ -424,8 +420,8 @@ class AnalyticsService {
     required String businessId,
     required String title,
     required String description,
-    required OfferType offerType,
-    required int requiredMinutes,
+    required String discountKind,
+    required double? discountValue,
     required String redemptionCode,
     required DateTime startsAt,
     required DateTime endsAt,
@@ -447,9 +443,9 @@ class AnalyticsService {
       max: 500,
       required: false,
     );
-    final normalizedRequiredMinutes = _requiredMinutes(
-      requiredMinutes,
-      offerType,
+    final normalizedDiscountValue = _normalizedDiscountValue(
+      discountKind,
+      discountValue,
     );
     final normalizedRedemptionCode = _cleanText(
       redemptionCode,
@@ -460,9 +456,11 @@ class AnalyticsService {
       'business_id': businessId,
       'title': normalizedTitle,
       'description': normalizedDescription,
-      'offer_type': offerType.value,
-      'required_minutes': normalizedRequiredMinutes,
+      'offer_type': OfferType.points.value,
+      'required_minutes': 0,
       'redemption_code': normalizedRedemptionCode,
+      'discount_kind': discountKind,
+      'discount_value': normalizedDiscountValue,
       'starts_at': startsAt.toUtc().toIso8601String(),
       'ends_at': endsAt.toUtc().toIso8601String(),
       'is_active': isActive,
@@ -471,47 +469,24 @@ class AnalyticsService {
     try {
       await _writeOffer(id: id, businessId: businessId, values: values);
     } catch (e) {
-      if (!_isSchemaMismatch(e)) throw AnalyticsException(_friendly(e));
-      if (offerType.isPromotion) {
-        final legacyValues = <String, dynamic>{
-          'business_id': businessId,
-          'title': normalizedTitle,
-          'description': _encodeLegacyOfferMetadata(
-            description: normalizedDescription,
-            offerType: offerType,
-            redemptionCode: normalizedRedemptionCode,
-          ),
-          'required_minutes': 1,
-          'is_active': isActive,
-        };
-        try {
-          await _writeOffer(
-            id: id,
-            businessId: businessId,
-            values: legacyValues,
-          );
-          return;
-        } catch (legacyError) {
-          throw AnalyticsException(_friendly(legacyError));
-        }
-      }
-      final legacyValues = <String, dynamic>{
-        'business_id': businessId,
-        'title': normalizedTitle,
-        'description': _encodeLegacyOfferMetadata(
-          description: normalizedDescription,
-          offerType: offerType,
-          redemptionCode: normalizedRedemptionCode,
-        ),
-        'required_minutes': normalizedRequiredMinutes,
-        'is_active': isActive,
-      };
-      try {
-        await _writeOffer(id: id, businessId: businessId, values: legacyValues);
-      } catch (legacyError) {
-        throw AnalyticsException(_friendly(legacyError));
-      }
+      throw AnalyticsException(_friendly(e));
     }
+  }
+
+  double _normalizedDiscountValue(String kind, double? value) {
+    if (kind != 'dollar' && kind != 'percent') {
+      throw const AnalyticsException('Choose a dollar or percentage discount.');
+    }
+    if (value == null || value <= 0) {
+      throw const AnalyticsException('Enter a discount amount greater than 0.');
+    }
+    if (kind == 'percent' && value > 100) {
+      throw const AnalyticsException('Percentage off cannot exceed 100%.');
+    }
+    if (kind == 'dollar' && value > 1000) {
+      throw const AnalyticsException('Discount amount is too high.');
+    }
+    return double.parse(value.toStringAsFixed(2));
   }
 
   Future<void> _writeOffer({
@@ -593,19 +568,11 @@ class AnalyticsService {
           .from('offers')
           .select(_directOfferColumns)
           .eq('business_id', businessId)
+          .eq('offer_type', 'points')
           .limit(100);
       return _parseDeals(data);
     } catch (_) {
-      try {
-        final data = await _client
-            .from('offers')
-            .select(_legacyDirectOfferColumns)
-            .eq('business_id', businessId)
-            .limit(100);
-        return _parseDeals(data);
-      } catch (_) {
-        return const <DealPerformance>[];
-      }
+      return const <DealPerformance>[];
     }
   }
 
@@ -639,7 +606,7 @@ class AnalyticsService {
     }
     if (text.contains('violates check constraint') ||
         text.contains('offers_title_check')) {
-      return 'Check the offer title, type, run window, study time, and POS coupon code.';
+      return 'Check the offer title, discount, run window, and POS coupon code.';
     }
     if (text.contains('permission denied') ||
         text.contains('offers') && text.contains('not found')) {
@@ -673,19 +640,6 @@ class AnalyticsService {
       throw AnalyticsException('$field must be $max characters or fewer.');
     }
     return normalized;
-  }
-
-  int _requiredMinutes(int value, OfferType offerType) {
-    if (offerType.isPromotion) return 0;
-    if (value < 1) {
-      throw const AnalyticsException(
-        'Required study time must be at least 1 minute.',
-      );
-    }
-    if (value > 100000) {
-      throw const AnalyticsException('Required study time is too high.');
-    }
-    return value;
   }
 }
 
@@ -732,9 +686,7 @@ const _legacyMarkerPrefix = '[CURA_OFFER_META:';
 const _legacyMarkerSuffix = ']';
 const _directOfferColumns =
     'id,business_id,title,description,offer_type,required_minutes,'
-    'redemption_code,starts_at,ends_at,is_active';
-const _legacyDirectOfferColumns =
-    'id,business_id,title,description,required_minutes,is_active';
+    'redemption_code,points_cost,discount_kind,discount_value,starts_at,ends_at,is_active';
 
 List<DealPerformance> _parseDeals(Object? data) {
   final rows = data is List ? data : const <Object?>[];
@@ -745,32 +697,9 @@ List<DealPerformance> _parseDeals(Object? data) {
 }
 
 class _LegacyOfferMetadata {
-  const _LegacyOfferMetadata({
-    required this.description,
-    this.offerType,
-    this.redemptionCode = '',
-  });
+  const _LegacyOfferMetadata({required this.description});
 
   final String description;
-  final OfferType? offerType;
-  final String redemptionCode;
-}
-
-String _encodeLegacyOfferMetadata({
-  required String description,
-  required OfferType offerType,
-  required String redemptionCode,
-}) {
-  final metadata = jsonEncode({
-    'offer_type': offerType.value,
-    'redemption_code': redemptionCode,
-  });
-  final encoded = base64Url.encode(utf8.encode(metadata));
-  final cleanDescription = _parseLegacyOfferMetadata(description).description;
-  return [
-    if (cleanDescription.trim().isNotEmpty) cleanDescription.trim(),
-    '$_legacyMarkerPrefix$encoded$_legacyMarkerSuffix',
-  ].join('\n\n');
 }
 
 _LegacyOfferMetadata _parseLegacyOfferMetadata(String value) {
@@ -784,20 +713,7 @@ _LegacyOfferMetadata _parseLegacyOfferMetadata(String value) {
     return _LegacyOfferMetadata(description: value);
   }
 
-  final encoded = trimmed.substring(
-    start + _legacyMarkerPrefix.length,
-    markerEnd,
+  return _LegacyOfferMetadata(
+    description: trimmed.substring(0, start).trimRight(),
   );
-  try {
-    final decoded = utf8.decode(base64Url.decode(encoded));
-    final json = jsonDecode(decoded);
-    if (json is! Map) return _LegacyOfferMetadata(description: value);
-    return _LegacyOfferMetadata(
-      description: trimmed.substring(0, start).trimRight(),
-      offerType: OfferType.fromValue(json['offer_type']),
-      redemptionCode: json['redemption_code']?.toString().trim() ?? '',
-    );
-  } catch (_) {
-    return _LegacyOfferMetadata(description: value);
-  }
 }

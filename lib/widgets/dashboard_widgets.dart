@@ -646,14 +646,7 @@ class DealCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double conversion = deal.studentsStarted == 0
-        ? 0
-        : deal.studentsUnlocked / deal.studentsStarted;
-    final double progress = deal.averageProgress.clamp(0.0, 1.0);
-    final bool isPromo = deal.isPromotion;
-    final String unlockLabel = isPromo
-        ? 'No study required'
-        : '${deal.requiredHours.toStringAsFixed(deal.requiredHours % 1 == 0 ? 0 : 1)} h to unlock';
+    final String discount = _discountLabel(deal);
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -687,13 +680,11 @@ class DealCard extends StatelessWidget {
             runSpacing: 8,
             children: <Widget>[
               _OfferBadge(
-                label: isPromo ? 'Walk-in promo' : 'Study reward',
-                icon: isPromo
-                    ? Icons.local_offer_rounded
-                    : Icons.timer_outlined,
-                selected: isPromo,
+                label: '${compactInt(deal.pointsCost)} points',
+                icon: Icons.auto_awesome_rounded,
+                selected: true,
               ),
-              _OfferBadge(label: unlockLabel, icon: Icons.school_outlined),
+              _OfferBadge(label: discount, icon: Icons.sell_outlined),
             ],
           ),
           if (deal.description.isNotEmpty)
@@ -732,103 +723,45 @@ class DealCard extends StatelessWidget {
             spacing: 22,
             runSpacing: 12,
             children: <Widget>[
-              if (isPromo) ...<Widget>[
-                _MiniStat(
-                  value: compactInt(deal.redemptions),
-                  label: 'Redeemed',
-                ),
-                _MiniStat(
-                  value: deal.isActive ? 'On' : 'Off',
-                  label: 'Visibility',
-                ),
-              ] else ...<Widget>[
-                _MiniStat(
-                  value: compactInt(deal.studentsStarted),
-                  label: 'Started',
-                ),
-                _MiniStat(
-                  value: compactInt(deal.studentsUnlocked),
-                  label: 'Unlocked',
-                ),
-                _MiniStat(
-                  value: compactInt(deal.redemptions),
-                  label: 'Redeemed',
-                ),
-                _MiniStat(
-                  value: '${(conversion * 100).toStringAsFixed(0)}%',
-                  label: 'Conversion',
-                ),
-              ],
+              _MiniStat(value: compactInt(deal.redemptions), label: 'Redeemed'),
+              _MiniStat(
+                value: compactInt(deal.studentsStarted),
+                label: 'Students',
+              ),
+              _MiniStat(
+                value: deal.isActive ? 'On' : 'Off',
+                label: 'Visibility',
+              ),
             ],
           ),
-          if (!isPromo) ...<Widget>[
-            const SizedBox(height: 16),
-            Row(
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.forest.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
               children: <Widget>[
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: LinearProgressIndicator(
-                      value: progress,
-                      minHeight: 8,
-                      backgroundColor: AppColors.espresso.withValues(
-                        alpha: 0.06,
-                      ),
-                      valueColor: const AlwaysStoppedAnimation<Color>(
-                        AppColors.forest,
-                      ),
-                    ),
-                  ),
+                const Icon(
+                  Icons.point_of_sale_rounded,
+                  size: 16,
+                  color: AppColors.forestDark,
                 ),
-                const SizedBox(width: 10),
-                Text(
-                  '${(progress * 100).toStringAsFixed(0)}%',
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.espresso,
-                    fontFeatures: const <FontFeature>[
-                      FontFeature.tabularFigures(),
-                    ],
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Points are spent when staff verifies the code. Students can earn enough points to redeem again.',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      height: 1.35,
+                      color: AppColors.forestDark,
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 6),
-            Text(
-              'Average progress',
-              style: GoogleFonts.inter(fontSize: 11.5, color: AppColors.mocha),
-            ),
-          ] else ...<Widget>[
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.forest.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: <Widget>[
-                  const Icon(
-                    Icons.storefront_rounded,
-                    size: 16,
-                    color: AppColors.forestDark,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Redeemable in person as soon as students see it.',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        height: 1.35,
-                        color: AppColors.forestDark,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+          ),
           if (deal.privacyLimited)
             Padding(
               padding: const EdgeInsets.only(top: 12),
@@ -972,6 +905,17 @@ class _OfferBadge extends StatelessWidget {
 String _dateLabel(DateTime value) {
   final DateTime local = value.toLocal();
   return '${local.month}/${local.day}/${local.year}';
+}
+
+String _discountLabel(DealPerformance deal) {
+  final value = deal.discountValue;
+  if (value == null || value <= 0) return 'Discount';
+  final formatted = value % 1 == 0
+      ? value.toStringAsFixed(0)
+      : value.toStringAsFixed(2).replaceFirst(RegExp(r'0+$'), '');
+  return deal.discountKind == 'percent'
+      ? '$formatted% off'
+      : '\$$formatted off';
 }
 
 class _MiniStat extends StatelessWidget {

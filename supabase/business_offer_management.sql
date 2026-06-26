@@ -14,36 +14,75 @@ begin
   end if;
 end $$;
 
-alter table public.offers add column if not exists offer_type text not null default 'study';
+alter table public.offers add column if not exists offer_type text not null default 'points';
+alter table public.offers alter column offer_type set default 'points';
+alter table public.offers add column if not exists required_minutes integer default 0;
+alter table public.offers alter column required_minutes set default 0;
 alter table public.offers add column if not exists redemption_code text;
+alter table public.offers add column if not exists discount_kind text;
+alter table public.offers add column if not exists discount_value numeric(8,2);
+alter table public.offers add column if not exists points_cost integer generated always as (
+  case
+    when discount_kind = 'dollar' then round(discount_value * 60)::integer
+    when discount_kind = 'percent' then round(discount_value * 10)::integer
+    else null
+  end
+) stored;
 alter table public.offers add column if not exists starts_at timestamptz;
 alter table public.offers add column if not exists ends_at timestamptz;
 
+delete from public.offers o
+where coalesce(o.offer_type, '') <> 'points'
+   or coalesce(o.required_minutes, 0) <> 0
+   or o.discount_kind is null
+   or o.discount_value is null;
+
+update public.offers
+   set offer_type = 'points',
+       required_minutes = 0
+ where offer_type is null
+    or required_minutes is null;
+
 alter table public.offers drop constraint if exists offers_type_check;
 alter table public.offers add constraint offers_type_check
-  check (offer_type in ('study', 'promotion'))
+  check (offer_type = 'points')
   not valid;
 
 alter table public.offers drop constraint if exists offers_required_minutes_check;
 alter table public.offers add constraint offers_required_minutes_check
-  check (
-    required_minutes is null
-    or (
-      offer_type = 'study'
-      and required_minutes between 1 and 100000
-    )
-    or (
-      offer_type = 'promotion'
-      and required_minutes = 0
-    )
-  )
+  check (required_minutes = 0)
   not valid;
 
 alter table public.offers drop constraint if exists offers_redemption_code_check;
 alter table public.offers add constraint offers_redemption_code_check
   check (
-    redemption_code is null
-    or length(trim(redemption_code)) between 1 and 80
+    redemption_code is not null
+    and length(trim(redemption_code)) between 1 and 80
+  )
+  not valid;
+
+alter table public.offers drop constraint if exists offers_discount_check;
+alter table public.offers add constraint offers_discount_check
+  check (
+    (
+      discount_kind = 'dollar'
+      and discount_value > 0
+      and discount_value <= 1000
+    )
+    or (
+      discount_kind = 'percent'
+      and discount_value > 0
+      and discount_value <= 100
+    )
+  )
+  not valid;
+
+alter table public.offers drop constraint if exists offers_points_cost_check;
+alter table public.offers add constraint offers_points_cost_check
+  check (
+    points_cost is not null
+    and points_cost > 0
+    and points_cost <= 60000
   )
   not valid;
 
@@ -51,6 +90,11 @@ alter table public.offers drop constraint if exists offers_window_check;
 alter table public.offers add constraint offers_window_check
   check (starts_at is null or ends_at is null or starts_at < ends_at)
   not valid;
+
+drop index if exists public.offer_redemptions_user_offer_unique;
+create unique index if not exists offer_redemptions_user_offer_pending_unique
+  on public.offer_redemptions (user_id, offer_id)
+  where status = 'pending';
 
 alter table public.offers enable row level security;
 
@@ -121,6 +165,9 @@ grant select (
   description,
   offer_type,
   required_minutes,
+  points_cost,
+  discount_kind,
+  discount_value,
   is_active,
   starts_at,
   ends_at,

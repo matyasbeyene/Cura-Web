@@ -1,6 +1,6 @@
 # Cura-Web Handoff
 
-Updated: 2026-06-16
+Updated: 2026-06-26
 
 Repo: `C:\Users\nanda\Documents\Cura-Web`
 Remote: `https://github.com/matyasbeyene/Cura-Web`
@@ -28,25 +28,25 @@ python tool/serve.py 8000 build/web
 
 ## Current Product State
 
-- Landing page supports student/business copy, intro animation, scroll video, dashboard entry, App Store CTA, and `mailto:info@cura.coffee`.
+- Landing page supports student/business copy, intro animation, scroll video, dashboard entry, App Store CTA sections, and `mailto:info@cura.coffee`.
+- The top appbar no longer shows the App Store button, and the business-view appbar no longer shows the small mail/contact button.
 - `/dashboard` requires a signed-in Supabase user who owns a `businesses` row.
 - Dashboard analytics come from `business_dashboard_summary(p_business_id, p_start_date, p_end_date)`.
 - The dashboard fetches current and previous date windows to show deltas.
 - Owner mutations go directly to the canonical `businesses -> offers` model with RLS.
 
-## June 16 Offer Work
+## June 26 Points Offer Migration
 
-The dashboard now matches the mobile owner portal for offer creation.
+The dashboard now matches the mobile owner portal for points-only offer creation. The legacy study-hours and walk-in-promo options are removed from the web UI and service writes.
 
 Owners can create/edit:
 
-- Study rewards: require study minutes at the business location.
-- Walk-in promos: no study required, redeemable in person.
+- Dollar-off or percent-off deals with a computed Cura points cost.
 - Run length in hours/days/weeks.
 - POS coupon code shown later to the barista in the mobile redemption flow.
 - Active/paused state.
 
-Dashboard cards now show offer type, run window, POS code, redemption counts, and study progress where relevant.
+Dashboard cards now show points cost, discount, run window, POS code, redemption counts, and visibility.
 
 Relevant files:
 
@@ -61,17 +61,17 @@ Use the same canonical Supabase schema as mobile:
 
 - `study_locations -> businesses -> offers`
 - `student_offer_progress` for student-facing progress
-- `offer_redemptions` for one-use redemption attempts
+- `offer_redemptions` for redemption attempts; history can repeat, only pending attempts are unique per student/offer
 - `business_dashboard_summary` for owner analytics
 
-`supabase/business_offer_management.sql` is a web-side alignment helper. The canonical full schema lives in the mobile repo's `supabase/rewards_schema.sql`.
+`supabase/business_offer_management.sql` is a web-side alignment helper. It constrains offers to `offer_type = 'points'`, deletes legacy/non-points offers when applied, and keeps broad selects away from POS codes. The canonical full schema lives in the mobile repo's `supabase/rewards_schema.sql`.
 
 Security rules:
 
 - POS codes should not be broadly selectable from active offer rows.
 - Owners receive POS codes only through owner-validated dashboard/RPC paths.
 - Keep all table writes constrained by RLS ownership checks.
-- Do not apply live Supabase SQL without explicit approval.
+- Live Supabase SQL was not applied from this shell because there is no Supabase CLI, `psql`, service key, or database URL available.
 
 ## Deployment Notes
 
@@ -83,6 +83,6 @@ Security rules:
 ## Still Open
 
 - Confirm production Supabase redirect URLs include `https://cura.coffee` for OAuth.
-- Apply the updated offer/redemption SQL to Supabase when ready.
+- Apply the updated offer/redemption SQL to Supabase from an authenticated database environment.
 - Add a real App Store URL when the mobile app has one.
 - A stronger barista/POS verification path would require barista auth or POS integration; the current flow is a physical handoff MVP.
