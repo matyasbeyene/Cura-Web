@@ -835,7 +835,7 @@ class _OfferEditorDialogState extends State<_OfferEditorDialog> {
                   icon: Icons.sell_rounded,
                   title: 'Discount & Cura points',
                   subtitle:
-                      'Students spend Cura points to redeem. \$1 off = 60 points, 1% off = 10 points.',
+                      'Students spend Cura points to redeem. \$1 off = 60 points, 1% off = 60 points.',
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: <Widget>[
@@ -1034,7 +1034,7 @@ class _OfferEditorDialogState extends State<_OfferEditorDialog> {
   int _computedPoints() {
     final amount = double.tryParse(_discountValue.text.trim());
     if (amount == null || amount <= 0) return 0;
-    final raw = _discountKind == 'percent' ? amount * 10 : amount * 60;
+    final raw = amount * 60;
     return raw.round().clamp(1, 60000).toInt();
   }
 

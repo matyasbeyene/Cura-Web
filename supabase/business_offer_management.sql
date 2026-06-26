@@ -24,7 +24,7 @@ alter table public.offers add column if not exists discount_value numeric(8,2);
 alter table public.offers add column if not exists points_cost integer generated always as (
   case
     when discount_kind = 'dollar' then round(discount_value * 60)::integer
-    when discount_kind = 'percent' then round(discount_value * 10)::integer
+    when discount_kind = 'percent' then round(discount_value * 60)::integer
     else null
   end
 ) stored;

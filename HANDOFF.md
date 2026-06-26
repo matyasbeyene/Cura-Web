@@ -42,6 +42,7 @@ The dashboard now matches the mobile owner portal for points-only offer creation
 Owners can create/edit:
 
 - Dollar-off or percent-off deals with a computed Cura points cost.
+- Automatic cost conversion is `$1 off = 60 points` and `1% off = 60 points`.
 - Run length in hours/days/weeks.
 - POS coupon code shown later to the barista in the mobile redemption flow.
 - Active/paused state.
@@ -64,14 +65,15 @@ Use the same canonical Supabase schema as mobile:
 - `offer_redemptions` for redemption attempts; history can repeat, only pending attempts are unique per student/offer
 - `business_dashboard_summary` for owner analytics
 
-`supabase/business_offer_management.sql` is a web-side alignment helper. It constrains offers to `offer_type = 'points'`, deletes legacy/non-points offers when applied, and keeps broad selects away from POS codes. The canonical full schema lives in the mobile repo's `supabase/rewards_schema.sql`.
+`supabase/business_offer_management.sql` is a web-side alignment helper. It constrains offers to `offer_type = 'points'`, prices both dollar and percent discounts at `discount_value * 60`, deletes legacy/non-points offers when applied, and keeps broad selects away from POS codes. The canonical full schema lives in the mobile repo's `supabase/rewards_schema.sql`.
 
 Security rules:
 
 - POS codes should not be broadly selectable from active offer rows.
 - Owners receive POS codes only through owner-validated dashboard/RPC paths.
 - Keep all table writes constrained by RLS ownership checks.
-- Live Supabase SQL was not applied from this shell because there is no Supabase CLI, `psql`, service key, or database URL available.
+- Canonical live Supabase rewards migrations were applied from the mobile repo
+  on 2026-06-26; this web SQL file is kept as a parity/alignment helper.
 
 ## Deployment Notes
 
@@ -83,6 +85,7 @@ Security rules:
 ## Still Open
 
 - Confirm production Supabase redirect URLs include `https://cura.coffee` for OAuth.
-- Apply the updated offer/redemption SQL to Supabase from an authenticated database environment.
+- Configure Supabase Auth custom domain plus Google OAuth consent/authorized
+  domain so Google shows `cura.coffee` instead of the Supabase project domain.
 - Add a real App Store URL when the mobile app has one.
 - A stronger barista/POS verification path would require barista auth or POS integration; the current flow is a physical handoff MVP.
